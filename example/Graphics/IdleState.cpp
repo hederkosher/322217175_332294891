@@ -1,9 +1,10 @@
 #include "IdleState.h"
 #include "NPC.h"
+#include "LogisticNPC.h"
 
 void IdleState::OnEnter(NPC* pn)
 {
-    pn->setIsMoving(false); // Ensure NPC stops
+    pn->setIsMoving(false);
 }
 
 void IdleState::Transition(NPC* pn)
@@ -13,8 +14,8 @@ void IdleState::Transition(NPC* pn)
 
 void IdleState::OnExit(NPC* pn)
 {
-    if(auto Logistic = dynamic_cast<LogisticNPC*>(pn))
+    if (auto Logistic = dynamic_cast<LogisticNPC*>(pn))
     {
         pn->setIsMoving(true);
-	}
+    }
 }

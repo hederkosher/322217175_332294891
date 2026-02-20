@@ -3,15 +3,12 @@
 #include "glut.h"
 
 
-namespace { 
+namespace {
     bool CheckCollision(double bulletX, double bulletY, NPC* targetNpc) {
-        if (!targetNpc) {
-            return false; 
-        }
+        if (!targetNpc) return false;
 
         double npcX, npcY;
         targetNpc->getPosition(npcX, npcY);
-
 
         int bulletGridX = static_cast<int>(bulletX);
         int bulletGridY = static_cast<int>(bulletY);
@@ -23,7 +20,7 @@ namespace {
 
         return hitX && hitY;
     }
-} 
+}
 
 Bullet::Bullet(double xPos, double yPos, double angle, int team)
 {
@@ -37,9 +34,7 @@ Bullet::Bullet(double xPos, double yPos, double angle, int team)
 
 void Bullet::Move(int map[MSZ][MSZ], NPC** team1, NPC** team2, double securityMap[MSZ][MSZ])
 {
-    if (!isMoving) {
-        return;
-    }
+    if (!isMoving) return;
 
     const double DAMAGE_HP = 60.0;
     double nextX = x + SPEED * dirX;
@@ -47,14 +42,21 @@ void Bullet::Move(int map[MSZ][MSZ], NPC** team1, NPC** team2, double securityMa
 
     int gridX = static_cast<int>(nextX);
     int gridY = static_cast<int>(nextY);
-    int value = map[gridX][gridY];
 
-    if (nextX < 0 || nextX >= MSZ || nextY < 0 || nextY >= MSZ || value == STONE || value == TREE)
-    {
-        isMoving = false; 
+    if (nextX < 0 || nextX >= MSZ || nextY < 0 || nextY >= MSZ) {
+        isMoving = false;
         return;
     }
 
+    int value = map[gridX][gridY];
+
+    // Bullets stop at walls and stone obstacles
+    if (value == WALL || value == STONE) {
+        isMoving = false;
+        return;
+    }
+
+    // Only hit enemies, no friendly fire
     NPC** targetTeam = (team == 1) ? team2 : team1;
 
     for (int i = 0; i < TEAM_SIZE; i++)

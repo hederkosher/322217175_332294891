@@ -1,4 +1,6 @@
 #include "FillMedicine.h"
+#include "NPC.h"
+#include "MedicNPC.h"
 
 void FillMedicine::OnEnter(NPC* pn)
 {
@@ -9,7 +11,6 @@ void FillMedicine::OnEnter(NPC* pn)
 
 void FillMedicine::Transition(NPC* pn)
 {
-
 	OnExit(pn);
 	if (auto mn = dynamic_cast<MedicNPC*>(pn)) {
 		pn->setCurrentState(new GoToTarget());
@@ -22,5 +23,4 @@ void FillMedicine::OnExit(NPC* pn)
 	if (auto mn = dynamic_cast<MedicNPC*>(pn)) {
 		mn->setIsFillingMedicine(false);
 	}
-
 }

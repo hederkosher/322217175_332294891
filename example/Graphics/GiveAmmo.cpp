@@ -1,4 +1,7 @@
 #include "GiveAmmo.h"
+#include "NPC.h"
+#include "LogisticNPC.h"
+#include "GoToArmory.h"
 
 void GiveAmmo::OnEnter(NPC* pn)
 {
@@ -9,7 +12,6 @@ void GiveAmmo::OnEnter(NPC* pn)
 
 void GiveAmmo::Transition(NPC* pn)
 {
-
 	OnExit(pn);
 	pn->setCurrentState(new GoToArmory());
 	pn->getCurrentState()->OnEnter(pn);
@@ -21,5 +23,4 @@ void GiveAmmo::OnExit(NPC* pn)
 		ln->setIsGivingAmmo(false);
 		ln->setGoToWarrior(false);
 	}
-
 }

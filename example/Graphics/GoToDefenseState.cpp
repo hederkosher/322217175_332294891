@@ -10,7 +10,6 @@ void GoToDefenseState::OnEnter(NPC* pn)
 
     std::vector<std::pair<int, int>> path;
 
-    // Use the Pathfinder with the NPC's team to find the correct path
     if (BFS::FindShortestPathToCover(currentX, currentY, pn->getTeam(), path) && !path.empty()) {
         pn->setPath(path);
         pn->setIsMoving(true);

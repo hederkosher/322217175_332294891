@@ -3,164 +3,290 @@
 #include "Bullet.h"
 #include <iostream>
 #include <math.h>
+#include <algorithm>
 #include "MoveToTargetState.h"
 #include "AttackState.h"
+#include "GoToDefenseState.h"
+#include "IdleState.h"
 
 extern int map[MSZ][MSZ];
-extern const int TREE_W;
-extern const int TREE_H;
 
-
-WarriorNPC::WarriorNPC(double positionX, double positionY, char character, int team , int type)
-	: NPC(positionX, positionY, character, team , type)
+WarriorNPC::WarriorNPC(double positionX, double positionY, char character, int team, int type)
+	: NPC(positionX, positionY, character, team, type)
 {
 	hp = MAX_HP;
 	ammo = AMMO_MAX;
 	pathIndex = -1;
-    isAttacking = false;
-    setCurrentState(new MoveToTargetState());
-    getCurrentState()->OnEnter(this);
+	isAttacking = false;
+
+	// Personality-derived thresholds
+	hpFleeThreshold = 0.25 + 0.2 * cautiousness - 0.15 * aggressiveness;
+	ammoFleeThreshold = 0.15 + 0.15 * cautiousness - 0.1 * aggressiveness;
+	if (hpFleeThreshold < 0.1) hpFleeThreshold = 0.1;
+	if (ammoFleeThreshold < 0.05) ammoFleeThreshold = 0.05;
+
+	std::string color = (team == 1 ? TEAM1 : TEAM2);
+	std::cout << color << "  Warrior thresholds: hpFlee=" << hpFleeThreshold
+		<< " ammoFlee=" << ammoFleeThreshold << RESET << std::endl;
+
+	setCurrentState(new MoveToTargetState());
+	getCurrentState()->OnEnter(this);
 }
 
 bool WarriorNPC::isInRisk() const
 {
-	bool lowHp = hp < MAX_HP / 2.0;
-	bool lowAmmo = ammo < AMMO_MAX / 3.0; 
+	bool lowHp = hp < MAX_HP * hpFleeThreshold;
+	bool lowAmmo = ammo < AMMO_MAX * ammoFleeThreshold;
 	return lowHp || lowAmmo;
 }
-
 
 void WarriorNPC::setAmmo(double value) { ammo = value; }
 double WarriorNPC::getAmmo() { return ammo; }
 void WarriorNPC::setIsAttacking(bool value) { isAttacking = value; }
 
+NPC* WarriorNPC::FindEnemyInSameRoom()
+{
+	if (!enemyTeam) return nullptr;
+	int myRoom = getCurrentRoom();
+	if (myRoom <= 0) return nullptr;
+
+	NPC* closest = nullptr;
+	double closestDist = 9999.0;
+
+	for (int i = 0; i < TEAM_SIZE; i++) {
+		if (enemyTeam[i] && enemyTeam[i]->getHp() > 0) {
+			if (enemyTeam[i]->getCurrentRoom() == myRoom) {
+				double ex, ey;
+				enemyTeam[i]->getPosition(ex, ey);
+				double d = Distance(x, y, ex, ey);
+				if (d < closestDist) {
+					closestDist = d;
+					closest = enemyTeam[i];
+				}
+			}
+		}
+	}
+	return closest;
+}
 
 bool WarriorNPC::FindVisibleEnemy(double& outX, double& outY)
 {
-    for (int i = 0; i < MSZ; i++) {
-        for (int j = 0; j < MSZ; j++) {
+	for (int i = 0; i < MSZ; i++) {
+		for (int j = 0; j < MSZ; j++) {
+			if (visibilityMap[i][j] > 0) {
+				outX = i;
+				outY = j;
+				return true;
+			}
+		}
+	}
+	return false;
+}
 
-            if (visibilityMap[i][j] > 0) {
-                outX = i; 
-                outY = j;
-                return true;
-            }
-        }
-    }
-    return false; 
+void WarriorNPC::EvaluatePriorities()
+{
+	if (isGettingHp) return;
+
+	double hpRatio = hp / MAX_HP;
+	double ammoRatio = ammo / AMMO_MAX;
+
+	// Priority 1: critical HP ? flee to cover or seek medic
+	if (hpRatio < hpFleeThreshold) {
+		if (!dynamic_cast<GoToDefenseState*>(pCurrentState)) {
+			std::string color = (team == 1 ? TEAM1 : TEAM2);
+			std::cout << color << "Warrior #" << npcType << " team " << team
+				<< ": HP critical (" << (int)hp << "), FLEEING!" << RESET << std::endl;
+
+			if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+
+			// Try to go to medic if available
+			if (myTeam && myTeam[2] && myTeam[2]->getHp() > 0) {
+				double mx, my;
+				myTeam[2]->getPosition(mx, my);
+				setTarget(mx, my);
+				PlanPathTo();
+				pCurrentState = new MoveToTargetState();
+				pCurrentState->OnEnter(this);
+			}
+			else {
+				pCurrentState = new GoToDefenseState();
+				pCurrentState->OnEnter(this);
+			}
+			return;
+		}
+	}
+
+	// Priority 2: low ammo ? seek logistic
+	if (ammoRatio < ammoFleeThreshold && isAttacking) {
+		std::string color = (team == 1 ? TEAM1 : TEAM2);
+		std::cout << color << "Warrior #" << npcType << " team " << team
+			<< ": ammo low (" << (int)ammo << "), seeking supply!" << RESET << std::endl;
+
+		if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+
+		// Go to logistic NPC if available
+		if (myTeam && myTeam[3] && myTeam[3]->getHp() > 0) {
+			double lx, ly;
+			myTeam[3]->getPosition(lx, ly);
+			setTarget(lx, ly);
+			PlanPathTo();
+			pCurrentState = new MoveToTargetState();
+			pCurrentState->OnEnter(this);
+		}
+		else {
+			pCurrentState = new IdleState();
+			pCurrentState->OnEnter(this);
+		}
+		return;
+	}
+
+	// Priority 3: enemy in same room ? attack
+	NPC* enemy = FindEnemyInSameRoom();
+	if (enemy && ammo > 0 && !dynamic_cast<AttackState*>(pCurrentState)) {
+		std::string color = (team == 1 ? TEAM1 : TEAM2);
+		std::cout << color << "Warrior #" << npcType << " team " << team
+			<< ": ENEMY IN ROOM! Attacking!" << RESET << std::endl;
+
+		if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+		pCurrentState = new AttackState();
+		pCurrentState->OnEnter(this);
+		return;
+	}
+
+	// If attacking but enemy left room, stop attacking
+	if (dynamic_cast<AttackState*>(pCurrentState) && !enemy) {
+		if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+		pCurrentState = new MoveToTargetState();
+		pCurrentState->OnEnter(this);
+	}
+}
+
+void WarriorNPC::SearchForEnemies()
+{
+	if (numRooms <= 0) return;
+
+	// Pick a random room to explore
+	int targetRoom = 1 + rand() % numRooms;
+	int attempts = 0;
+	while (targetRoom == getCurrentRoom() && attempts < 10) {
+		targetRoom = 1 + rand() % numRooms;
+		attempts++;
+	}
+	searchTargetRoom = targetRoom;
+
+	Room* room = GetRoomById(targetRoom);
+	if (room) {
+		int tx = room->x1 + 3 + rand() % max(1, room->x2 - room->x1 - 6);
+		int ty = room->y1 + 3 + rand() % max(1, room->y2 - room->y1 - 6);
+		setTarget(tx, ty);
+		PlanPathTo();
+
+		std::string color = (team == 1 ? TEAM1 : TEAM2);
+		std::cout << color << "Warrior #" << npcType << " team " << team
+			<< ": searching room " << targetRoom << " at (" << tx << "," << ty << ")" << RESET << std::endl;
+	}
 }
 
 static int warrior_counter_grenade_frames = 0;
 
 void WarriorNPC::DoSomeWork()
 {
-    if (pCurrentState)
-        pCurrentState->Transition(this);
+	// Evaluate priorities (may force state transitions)
+	EvaluatePriorities();
 
-    if (isMoving && !isGettingHp)
-    {
-        arrivedAtTarget = false;
-        if (FollowPlannedPath(0.15))
-        {
-            arrivedAtTarget = true;
-			std::cout << "Warrior NPC #" << team << " type: " << npcType << " reached target (" << targetX << ", " << targetY << ")" << std::endl;
-       }
-    }
+	if (pCurrentState)
+		pCurrentState->Transition(this);
 
-	if (!isMoving && !isGettingHp && x==targetX && y == targetY)
+	if (isMoving && !isGettingHp)
 	{
-        int const RADIUS = 30;
-        int offsetX = (rand() % (2 * RADIUS + 1)) - RADIUS;
-        int offsetY = (rand() % (2 * RADIUS + 1)) - RADIUS;
+		arrivedAtTarget = false;
+		if (FollowPlannedPath(0.15))
+		{
+			arrivedAtTarget = true;
+			framesAtTarget++;
 
-        int targetI = x + offsetX;
-        int targetJ = y + offsetY;
-        setTarget(targetI, targetJ);
-        PlanPathTo();
-        if (auto idleState = dynamic_cast<IdleState*>(getCurrentState())) {
-            //attack is in idle state, order to go to attack
-            if (getCurrentState() != nullptr) {
-                getCurrentState()->OnExit(this);
-            }
-            setCurrentState(new AttackState());
-            getCurrentState()->OnEnter(this);
-        }
+			// If arrived and idle/moving, search for enemies in new room
+			if (framesAtTarget > 60) {
+				framesAtTarget = 0;
+				if (!dynamic_cast<AttackState*>(pCurrentState) &&
+					!dynamic_cast<GoToDefenseState*>(pCurrentState))
+				{
+					SearchForEnemies();
+				}
+			}
+		}
 	}
 
-    else if (isAttacking)
-    {
-        arrivedAtTarget = false;
-        double enemyX, enemyY;
-        if (FindVisibleEnemy(enemyX, enemyY) && ammo > 0)
-        {
-            setAmmo(ammo - 0.01);
-
-			//calculate angle to enemy
-            double dx = enemyX  - (x + 1.5); //enemy center
-            double dy = enemyY  - (y + 1.5);
-			double angle = atan2(dy, dx); //radians
-
-			//creare bullet if not already created
-            if (pBullet == nullptr)
-            {
-				pBullet = new Bullet(x + 1.5 , y + 1.5 , angle, team);
-				pBullet->setIsMoving(true);
-            }
-        }
-    }
-    if (auto idleState = dynamic_cast<IdleState*>(getCurrentState())) {
-        if (warrior_counter_grenade_frames % 180 ==0)
-        {
-			int offset = team == 1 ? -5 : 5;
-            double grenadeX = x + offset;
-            double grenadeY = y + offset;
-            double angle = (rand() % 360) * 3.14 / 180; // random angle
-            double distance = 20.0; // fixed distance
-            double targetX = grenadeX + distance * cos(angle);
-            double targetY = grenadeY + distance * sin(angle);
-            // Clamp target within map boundaries
-            if (targetX < 0) targetX = 0;
-            if (targetX > MSZ) targetX = MSZ;
-            if (targetY < 0) targetY = 0;
-            if (targetY > MSZ) targetY = MSZ;
-            // Create and throw grenade
-            if (pGrenade == nullptr && ammo >=5)
-            {
-                pGrenade = new Grenade(grenadeX, grenadeY, team);
-                std::cout << GRENADE << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << RESET << std::endl;
-				std::cout << GRENADE << "Warrior NPC #" << team << " type: " << npcType << " threw a grenade!" << RESET << std::endl;
-                std::cout << GRENADE << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << RESET << std::endl;
-                pGrenade->setIsExploded(true);
-				ammo = ammo - 5;
-            }
+	if (!isMoving && !isGettingHp && !isAttacking)
+	{
+		framesAtTarget++;
+		if (framesAtTarget > 120) {
+			framesAtTarget = 0;
+			SearchForEnemies();
+			if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+			pCurrentState = new MoveToTargetState();
+			pCurrentState->OnEnter(this);
 		}
-        warrior_counter_grenade_frames++;
-    }
+	}
+
+	// Attacking logic: only fire when enemy is in the same room
+	if (isAttacking)
+	{
+		arrivedAtTarget = false;
+		NPC* enemy = FindEnemyInSameRoom();
+		if (enemy && ammo > 0)
+		{
+			setAmmo(ammo - 0.01);
+
+			double ex, ey;
+			enemy->getPosition(ex, ey);
+			double dx = (ex + 1.5) - (x + 1.5);
+			double dy = (ey + 1.5) - (y + 1.5);
+			double angle = atan2(dy, dx);
+
+			if (pBullet == nullptr) {
+				pBullet = new Bullet(x + 1.5, y + 1.5, angle, team);
+				pBullet->setIsMoving(true);
+			}
+		}
+	}
+
+	// Grenade throwing (periodic, when idle and have ammo)
+	if (auto idleState = dynamic_cast<IdleState*>(getCurrentState())) {
+		if (warrior_counter_grenade_frames % 180 == 0)
+		{
+			NPC* enemy = FindEnemyInSameRoom();
+			if (enemy && pGrenade == nullptr && ammo >= 5) {
+				double ex, ey;
+				enemy->getPosition(ex, ey);
+				pGrenade = new Grenade(ex + 1.5, ey + 1.5, team);
+				std::cout << GRENADE << "Warrior #" << npcType << " team " << team
+					<< " threw a grenade!" << RESET << std::endl;
+				pGrenade->setIsExploded(true);
+				ammo -= 5;
+			}
+		}
+		warrior_counter_grenade_frames++;
+	}
 }
 
 void WarriorNPC::show() {
 	NPC::show();
 	double size = 3.0;
 
-	const double barW = 0.35;     // bar width
-	const double barH = size;     // bar height
-	const double barX0 = x - 0.6; // left of NPC
+	const double barW = 0.35;
+	const double barH = size;
+	const double barX0 = x - 0.6;
 	const double barY0 = y;
 
-	// Normalize ammo to [0,1]
 	double na = ammo / AMMO_MAX;
 	if (na < 0.0) na = 0.0;
 	if (na > 1.0) na = 1.0;
 
-	// Discrete colors:
-	// 0–20%   -> Red
-	// 20–60%  -> Orange
-	// 60–100% -> Purple
-	if (na < 0.20)        glColor3d(1.0, 0.0, 0.0);   // red
-	else if (na < 0.60)   glColor3d(0.0, 0.0, 0.6);   // dark blue
-	else                  glColor3d(0.6, 0.0, 0.8);   // purple
+	if (na < 0.20)        glColor3d(1.0, 0.0, 0.0);
+	else if (na < 0.60)   glColor3d(0.0, 0.0, 0.6);
+	else                  glColor3d(0.6, 0.0, 0.8);
 
-	// Fill (bottom -> up)
 	double fillH = barH * na;
 	glBegin(GL_QUADS);
 	glVertex2d(barX0, barY0);
@@ -171,10 +297,6 @@ void WarriorNPC::show() {
 }
 
 Bullet* WarriorNPC::getBullet() const { return pBullet; }
-
 void WarriorNPC::setBullet(Bullet* bullet) { pBullet = bullet; }
-
 Grenade* WarriorNPC::getGrenade() const { return pGrenade; }
-
 void WarriorNPC::setGrenade(Grenade* grenade) { pGrenade = grenade; }
-

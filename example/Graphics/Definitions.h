@@ -5,8 +5,8 @@
 const std::string RESET = "\033[0m";
 
 // Team colors
-const std::string TEAM1 = "\033[38;2;255;165;0m";   // Orange
-const std::string TEAM2 = "\033[38;2;0;200;255m";   // Light Blue
+const std::string TEAM1 = "\033[38;2;255;165;0m"; // Orange
+const std::string TEAM2 = "\033[38;2;0;200;255m"; // Light Blue
 const std::string GRENADE = "\033[38;2;180;255;0m";
 const std::string GAME_END = "\033[38;2;180;0;255m"; // Royal purple
 
@@ -16,32 +16,18 @@ const int AMMO_MAX = 100;
 const int MEDICINE_MAX = 100;
 const double SECURITY = 0.003;
 
-const int TEAM_SIZE = 5;
+const int TEAM_SIZE = 4; // 2 Warriors + 1 Medic + 1 Supply
 
 const int MSZ = 100;
-//Armory and Medicine positions
-const int ARMORY_1_X = 90;
-const int ARMORY_1_Y = 50;
 
-const int ARMORY_2_X = 10;
-const int ARMORY_2_Y = 60;
+// Terrain types
+const int FLOOR = 0;
+const int WALL = 1;
+const int STONE = 2;    // Cover obstacle in rooms
+const int ARMORY = 3;   // Ammo depot
+const int MEDICINE = 4; // Medicine depot
 
-const int MEDICINE_1_X = 85;
-const int MEDICINE_1_Y = 65;
-
-const int MEDICINE_2_X = 1;
-const int MEDICINE_2_Y = 43;
-
-
-const int STONE = 1;
-const int TREE = 2;
-const int WATER = 3;
-const int ARMORY_1 = 4;
-const int ARMORY_2 = 5;
-const int MEDICNE_1 = 6;
-const int MEDICNE_2 = 7;
-const int COMMANDER_1 = 8;
-const int COMMANDER_2 = 9;
+// NPC type IDs
 const int WARRIOR_1_1 = 10;
 const int WARRIOR_1_2 = 11;
 const int WARRIOR_2_1 = 12;
@@ -51,7 +37,7 @@ const int MEDIC_2 = 15;
 const int LOGISTIC_1 = 16;
 const int LOGISTIC_2 = 17;
 
-
-
-
-
+// Maze / Room constants
+const int GRID_ROWS = 3;
+const int GRID_COLS = 3;
+const int MAX_ROOMS = GRID_ROWS * GRID_COLS;

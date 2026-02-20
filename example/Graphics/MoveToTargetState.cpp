@@ -1,5 +1,5 @@
 #include "MoveToTargetState.h"
-#include <iostream> 
+#include <iostream>
 
 void MoveToTargetState::OnEnter(NPC* pn)
 {
@@ -15,8 +15,9 @@ void MoveToTargetState::Transition(NPC* pn)
 {
 	if (auto warrior = dynamic_cast<WarriorNPC*>(pn))
 	{
-		double enemyX, enemyY;
-		if (warrior->getAmmo() > 0 && warrior->FindVisibleEnemy(enemyX, enemyY))
+		// Room-based: only attack if enemy is in the same room
+		NPC* enemy = warrior->FindEnemyInSameRoom();
+		if (warrior->getAmmo() > 0 && enemy)
 		{
 			OnExit(pn);
 			warrior->setCurrentState(new AttackState());

@@ -11,7 +11,7 @@ static inline bool inBounds(int i, int j) {
 }
 
 static inline bool isBlocked(int cell) {
-    return (cell == STONE) || (cell == TREE) || (cell == WATER);
+    return (cell == WALL) || (cell == STONE);
 }
 
 static inline bool cellBlockedOrOOB(int i, int j) {
@@ -19,10 +19,8 @@ static inline bool cellBlockedOrOOB(int i, int j) {
     return isBlocked(map[i][j]);
 }
 
-
 static const double RISK_WEIGHT = 10.0;
-
-static const int NPC_HALF = 1; 
+static const int NPC_HALF = 1;
 
 static const int DIRS = 8;
 static const int di[DIRS] = { -1,-1,-1, 0, 0, 1, 1, 1 };
@@ -49,16 +47,14 @@ static inline bool footprintFree(int i, int j) {
     return true;
 }
 
-
 static inline bool canStepDiagWithFootprint(int ci, int cj, int ni, int nj) {
     int sdi = ni - ci, sdj = nj - cj;
-    if (sdi != 0 && sdj != 0) { 
+    if (sdi != 0 && sdj != 0) {
         if (!footprintFree(ci, cj + sdj)) return false;
         if (!footprintFree(ci + sdi, cj)) return false;
     }
     return true;
 }
-
 
 bool FindPath(int si, int sj, int ti, int tj, std::vector<std::pair<int, int>>& outPath) {
     outPath.clear();

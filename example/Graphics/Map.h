@@ -1,29 +1,31 @@
 #pragma once
 #include "Definitions.h"
-#include "NPC.h"
-#include "LogisticNPC.h"
-#include "MedicNPC.h"
-#include "WarriorNPC.h"
-#include "CommanderNPC.h"
+
+class NPC;
 
 // Terrain map
 extern int map[MSZ][MSZ];
 
-//  Trees (3x4) 
-extern const int TREE;
-extern const int TREE_W;      // 3
-extern const int TREE_H;      // 4
-extern const int TREE_COUNT;  // 10
-extern int treeX[];
-extern int treeY[];
+// Room system
+struct Room {
+  int id;
+  int x1, y1, x2, y2; // interior bounds (inclusive)
+  int centerX() const { return (x1 + x2) / 2; }
+  int centerY() const { return (y1 + y2) / 2; }
+};
 
-static void placeStones();
-static void placeWater();
-void generateSquare(int type, NPC** npc, char symbol, int team, int x_min, int x_max, int y_min, int y_max, NPC** teamNPC);
-void generateSquareMapObject(int type, int x, int y);
-static void placeArmoryMedicne();
-static void PlaceTroops(NPC** team1, NPC** team2);
-static void placeTrees();
-void InitMap(NPC** team1, NPC** team2);
-void drawChar(int i, int j, int type, char character);
+extern Room rooms[MAX_ROOMS];
+extern int numRooms;
+extern int roomId[MSZ][MSZ]; // 0 = wall/passage, >0 = room id
+
+// Depot positions (2 armories, 2 medicine depots)
+extern int armoryX[2], armoryY[2];
+extern int medicineX[2], medicineY[2];
+
+// Room utility functions
+int GetRoomAt(double x, double y);
+bool AreInSameRoom(double x1, double y1, double x2, double y2);
+Room *GetRoomById(int id);
+
+void InitMap(NPC **team1, NPC **team2);
 void DrawMap();

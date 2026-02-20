@@ -3,15 +3,16 @@
 #include "Map.h"
 #include "SecurityMap.h"
 #include <cmath>
+#include <iostream>
 
 
-NPC::NPC(double positionX, double positionY, char character, int team , int type)
+NPC::NPC(double positionX, double positionY, char character, int team, int type)
 {
 	x = positionX;
 	y = positionY;
 	symbol = character;
 	this->team = team;
-	hp = 7*MAX_HP/8;
+	hp = 7 * MAX_HP / 8;
 	viewDistance = 30.0;
 	this->npcType = type;
 	directionX = 0.0;
@@ -20,12 +21,18 @@ NPC::NPC(double positionX, double positionY, char character, int team , int type
 	targetX = 0.0;
 	targetY = 0.0;
 
-	//init visibility map
-	for (int i = 0; i < MSZ; i++) {
-		for (int j = 0; j < MSZ; j++) {
-			visibilityMap[i][j] = 0; 
-		}
-	}
+	// Generate random personality
+	aggressiveness = 0.3 + (rand() % 7) * 0.1; // 0.3 to 0.9
+	cautiousness = 0.3 + (rand() % 7) * 0.1;   // 0.3 to 0.9
+
+	std::string color = (team == 1 ? TEAM1 : TEAM2);
+	std::cout << color << "NPC [" << character << "] Team " << team
+		<< " personality: aggression=" << aggressiveness
+		<< " caution=" << cautiousness << RESET << std::endl;
+
+	for (int i = 0; i < MSZ; i++)
+		for (int j = 0; j < MSZ; j++)
+			visibilityMap[i][j] = 0;
 }
 
 bool NPC::isInRisk() const
@@ -46,7 +53,7 @@ void NPC::setMovingDirection()
 	directionX = targetX - x;
 	directionY = targetY - y;
 	length = sqrt(directionX * directionX + directionY * directionY);
-
+	if (length < 0.001) return;
 	directionX /= length;
 	directionY /= length;
 }
@@ -65,22 +72,16 @@ void NPC::show()
 	glVertex2d(x, y + size);
 	glEnd();
 
-	// label
 	glColor3d(0, 0, 0);
 	glRasterPos2d(x + 0.9, y + 0.5);
 	glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, symbol);
-	// Show HP bar
+
+	// HP bar
 	glLineWidth(2);
-
-	// Normalize hp (assuming max HP is 1000 for example)
 	double normalizedHP = hp / MAX_HP;
-
-	// Interpolate between red (low HP) and green (full HP)
-	double red = 1.0 - normalizedHP;  // more red when HP is low
-	double green = normalizedHP;      // more green when HP is high
-	double blue = 0.0;
-
-	glColor3d(red, green, blue);
+	double red = 1.0 - normalizedHP;
+	double green = normalizedHP;
+	glColor3d(red, green, 0.0);
 
 	glBegin(GL_LINES);
 	glVertex2d(x, y + 3.5);
@@ -88,10 +89,6 @@ void NPC::show()
 	glEnd();
 
 	glLineWidth(1);
-
-	
-
-
 }
 
 void NPC::setIsMoving(bool value) { isMoving = value; }
@@ -113,6 +110,10 @@ int (*NPC::getVisibilityMap())[MSZ] {
 	return visibilityMap;
 }
 
+int NPC::getCurrentRoom() const {
+	return GetRoomAt(x + 1.5, y + 1.5);
+}
+
 bool NPC::PlanPathTo() {
 	int ti = int(targetX);
 	int tj = int(targetY);
@@ -125,22 +126,19 @@ bool NPC::PlanPathTo() {
 		pathIndex = (path.size() > 1) ? 1 : -1;
 		return true;
 	}
-	int escape_moves[4][2] = { {-3, 0}, {0, 3}, {0, -3}, {3, 0} };
 
+	int escape_moves[4][2] = { {-3, 0}, {0, 3}, {0, -3}, {3, 0} };
 	for (auto& move : escape_moves) {
 		int new_si = si + move[0];
 		int new_sj = sj + move[1];
-
-	
 		if (new_si >= 0 && new_si < MSZ && new_sj >= 0 && new_sj < MSZ &&
-			map[new_si][new_sj] != STONE && map[new_si][new_sj] != TREE && map[new_si][new_sj] != WATER)
+			map[new_si][new_sj] != WALL && map[new_si][new_sj] != STONE)
 		{
 			path.clear();
 			path.push_back({ si, sj });
 			path.push_back({ new_si, new_sj });
-
-			pathIndex = 1; 
-			return true;   
+			pathIndex = 1;
+			return true;
 		}
 	}
 
@@ -182,12 +180,11 @@ void NPC::DrawPath() const {
 	glColor3d(1.0, 1.0, 0.0);
 	glBegin(GL_LINE_STRIP);
 	for (const auto& cell : path) {
-		double vx = cell.first + 0.5; 
-		double vy = cell.second + 0.5; 
+		double vx = cell.first + 0.5;
+		double vy = cell.second + 0.5;
 		glVertex2d(vx, vy);
 	}
 	glEnd();
-
 
 	glPointSize(5.0f);
 	glBegin(GL_POINTS);
@@ -197,27 +194,23 @@ void NPC::DrawPath() const {
 		glVertex2d(vx, vy);
 	}
 	glEnd();
-
 }
 
-bool NPC::HasLineOfSight(double targetX, double targetY) const
+bool NPC::HasLineOfSight(double tX, double tY) const
 {
 	double startX = x + 1.5;
 	double startY = y + 1.5;
-
 	double currentX = startX;
 	double currentY = startY;
 
-	double dx = targetX - startX; 
-	double dy = targetY - startY; 
+	double dx = tX - startX;
+	double dy = tY - startY;
 	double distance = sqrt(dx * dx + dy * dy);
 
-	if (distance < 1.0) {
-		return true;
-	}
+	if (distance < 1.0) return true;
 
-	double stepX = (dx / distance)*1.2;
-	double stepY = (dy / distance)*1.5;
+	double stepX = (dx / distance) * 1.2;
+	double stepY = (dy / distance) * 1.5;
 
 	for (int i = 0; i < static_cast<int>(distance); ++i)
 	{
@@ -226,28 +219,23 @@ bool NPC::HasLineOfSight(double targetX, double targetY) const
 		int mapX = static_cast<int>(currentX);
 		int mapY = static_cast<int>(currentY);
 
-		if (mapX < 0 || mapX >= MSZ || mapY < 0 || mapY >= MSZ) {
+		if (mapX < 0 || mapX >= MSZ || mapY < 0 || mapY >= MSZ)
 			return false;
-		}
 
-		if (map[mapX][mapY] == STONE || map[mapX][mapY] == TREE) {
+		if (map[mapX][mapY] == WALL || map[mapX][mapY] == STONE)
 			return false;
-		}
 	}
 	return true;
 }
 
-void NPC::UpdateVisibility(NPC* myTeam[TEAM_SIZE], NPC* enemyTeam[TEAM_SIZE])
+void NPC::UpdateVisibility(NPC* myTeamArr[TEAM_SIZE], NPC* enemyTeamArr[TEAM_SIZE])
 {
-	for (int i = 0; i < MSZ; i++) {
-		for (int j = 0; j < MSZ; j++) {
+	for (int i = 0; i < MSZ; i++)
+		for (int j = 0; j < MSZ; j++)
 			visibilityMap[i][j] = 0;
-		}
-	}
 
-	//scan enemy team (positive value)
 	for (int i = 0; i < TEAM_SIZE; i++) {
-		NPC* currentEnemy = enemyTeam[i];
+		NPC* currentEnemy = enemyTeamArr[i];
 		if (currentEnemy == nullptr) continue;
 
 		double entityX, entityY;
@@ -258,16 +246,14 @@ void NPC::UpdateVisibility(NPC* myTeam[TEAM_SIZE], NPC* enemyTeam[TEAM_SIZE])
 		if (Distance(x, y, entityX, entityY) <= viewDistance && HasLineOfSight(entityX, entityY)) {
 			int mapX = static_cast<int>(entityX);
 			int mapY = static_cast<int>(entityY);
-			if (mapX >= 0 && mapX < MSZ && mapY >= 0 && mapY < MSZ) {
-				visibilityMap[mapX][mapY] = currentEnemy->getNpcType(); //positive value for enemy
-			}
+			if (mapX >= 0 && mapX < MSZ && mapY >= 0 && mapY < MSZ)
+				visibilityMap[mapX][mapY] = currentEnemy->getNpcType();
 		}
 	}
 
-	//scan my team (negative value)
 	for (int i = 0; i < TEAM_SIZE; i++) {
-		NPC* currentTeammate = myTeam[i];
-		if (currentTeammate == nullptr || currentTeammate == this) continue; //skip self
+		NPC* currentTeammate = myTeamArr[i];
+		if (currentTeammate == nullptr || currentTeammate == this) continue;
 
 		double entityX, entityY;
 		currentTeammate->getPosition(entityX, entityY);
@@ -275,10 +261,8 @@ void NPC::UpdateVisibility(NPC* myTeam[TEAM_SIZE], NPC* enemyTeam[TEAM_SIZE])
 		if (Distance(x, y, entityX, entityY) <= viewDistance && HasLineOfSight(entityX, entityY)) {
 			int mapX = static_cast<int>(entityX);
 			int mapY = static_cast<int>(entityY);
-			if (mapX >= 0 && mapX < MSZ && mapY >= 0 && mapY < MSZ) {
-				//negative value for teammate
+			if (mapX >= 0 && mapX < MSZ && mapY >= 0 && mapY < MSZ)
 				visibilityMap[mapX][mapY] = -currentTeammate->getNpcType();
-			}
 		}
 	}
 }
@@ -286,78 +270,37 @@ void NPC::UpdateVisibility(NPC* myTeam[TEAM_SIZE], NPC* enemyTeam[TEAM_SIZE])
 
 void NPC::DrawVisibilityMap() const
 {
-	int i, j;
-
-	for (i = 0; i < MSZ; i++)
+	for (int i = 0; i < MSZ; i++)
 	{
-		for (j = 0; j < MSZ; j++)
+		for (int j = 0; j < MSZ; j++)
 		{
 			if (HasLineOfSight(i + 0.5, j + 0.5))
 			{
 				if (visibilityMap[i][j] != 0)
 				{
 					glColor3d(1.0, 1.0, 0.0);
-					glBegin(GL_POLYGON);
-					glVertex2d(i, j);
-					glVertex2d(i, j + 1);
-					glVertex2d(i + 1, j + 1);
-					glVertex2d(i + 1, j);
-					glEnd();
 				}
 				else
 				{
 					switch (map[i][j])
 					{
-					case 0:
+					case FLOOR:
 						glColor3d(0.9, 0.9, 0.9);
-						glBegin(GL_POLYGON);
-						glVertex2d(i, j);
-						glVertex2d(i, j + 1);
-						glVertex2d(i + 1, j + 1);
-						glVertex2d(i + 1, j);
-						glEnd();
 						break;
-
+					case WALL:
+						glColor3d(0.2, 0.2, 0.25);
+						break;
 					case STONE:
-						glColor3d(0.3, 0.3, 0.3);
-						glBegin(GL_POLYGON);
-						glVertex2d(i, j);
-						glVertex2d(i, j + 1);
-						glVertex2d(i + 1, j + 1);
-						glVertex2d(i + 1, j);
-						glEnd();
+						glColor3d(0.45, 0.42, 0.38);
 						break;
-
-					case TREE:
-						glColor3d(0.0, 0.6, 0.0);
-						glBegin(GL_POLYGON);
-						glVertex2d(i, j);
-						glVertex2d(i, j + 1);
-						glVertex2d(i + 1, j + 1);
-						glVertex2d(i + 1, j);
-						glEnd();
+					case ARMORY:
+						glColor3d(0.9, 0.75, 0.1);
 						break;
-
-					case WATER:
-						glColor3d(0.6, 0.8, 1.0);
-						glBegin(GL_POLYGON);
-						glVertex2d(i, j);
-						glVertex2d(i, j + 1);
-						glVertex2d(i + 1, j + 1);
-						glVertex2d(i + 1, j);
-						glEnd();
+					case MEDICINE:
+						glColor3d(0.9, 0.2, 0.3);
 						break;
-					case ARMORY_1:
-					case ARMORY_2:
-					case MEDICNE_1:
-					case MEDICNE_2:
-						glColor3d(1.0, 0.9, 0.2);
-						glBegin(GL_POLYGON);
-						glVertex2d(i, j);
-						glVertex2d(i, j + 1);
-						glVertex2d(i + 1, j + 1);
-						glVertex2d(i + 1, j);
-						glEnd();
+					default:
+						glColor3d(0.9, 0.9, 0.9);
 						break;
 					}
 				}
@@ -365,20 +308,20 @@ void NPC::DrawVisibilityMap() const
 			else
 			{
 				glColor3d(0.1, 0.1, 0.1);
-				glBegin(GL_POLYGON);
-				glVertex2d(i, j);
-				glVertex2d(i, j + 1);
-				glVertex2d(i + 1, j + 1);
-				glVertex2d(i + 1, j);
-				glEnd();
 			}
+
+			glBegin(GL_POLYGON);
+			glVertex2d(i, j);
+			glVertex2d(i, j + 1);
+			glVertex2d(i + 1, j + 1);
+			glVertex2d(i + 1, j);
+			glEnd();
 		}
 	}
 }
 
 void NPC::setPath(const std::vector<std::pair<int, int>>& newPath) {
 	path = newPath;
-	// Start at index 1 since index 0 is the current location
 	pathIndex = newPath.size() > 1 ? 1 : -1;
 }
 
