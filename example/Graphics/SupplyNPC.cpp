@@ -1,30 +1,30 @@
-#include "LogisticNPC.h"
+#include "SupplyNPC.h"
 #include "GoToWarrior.h"
 #include <iostream>
 
 static int counter = 0;
 
-LogisticNPC::LogisticNPC(double positionX, double positionY, char character,
-                         int team, int type)
+SupplyNPC::SupplyNPC(double positionX, double positionY, char character,
+                     int team, int type)
     : NPC(positionX, positionY, character, team, type) {
   setCurrentState(new GoToArmory());
   getCurrentState()->OnEnter(this);
   setAmmo(AMMO_MAX / 10);
 }
 
-void LogisticNPC::setWarriorPointer(WarriorNPC *pW) { pWarrior = pW; }
-WarriorNPC *LogisticNPC::getWarriorPointer() { return pWarrior; }
-bool LogisticNPC::getGoToWarrior() { return goToWarrior; }
-void LogisticNPC::setGoToWarrior(bool goToW) { goToWarrior = goToW; }
-bool LogisticNPC::getIsGivingAmmo() { return isGivingAmmo; }
-void LogisticNPC::setIsGivingAmmo(bool isGive) { isGivingAmmo = isGive; }
-bool LogisticNPC::getIsFillingAmmo() { return isFillingAmmo; }
-void LogisticNPC::setIsFillingAmmo(bool isFill) { isFillingAmmo = isFill; }
-void LogisticNPC::setAmmo(double value) { ammo = value; }
-bool LogisticNPC::getStayedAtArmory() { return stayedAtArmory; }
-void LogisticNPC::setStayedAtArmory(bool stayed) { stayedAtArmory = stayed; }
+void SupplyNPC::setWarriorPointer(WarriorNPC *pW) { pWarrior = pW; }
+WarriorNPC *SupplyNPC::getWarriorPointer() { return pWarrior; }
+bool SupplyNPC::getGoToWarrior() { return goToWarrior; }
+void SupplyNPC::setGoToWarrior(bool goToW) { goToWarrior = goToW; }
+bool SupplyNPC::getIsGivingAmmo() { return isGivingAmmo; }
+void SupplyNPC::setIsGivingAmmo(bool isGive) { isGivingAmmo = isGive; }
+bool SupplyNPC::getIsFillingAmmo() { return isFillingAmmo; }
+void SupplyNPC::setIsFillingAmmo(bool isFill) { isFillingAmmo = isFill; }
+void SupplyNPC::setAmmo(double value) { ammo = value; }
+bool SupplyNPC::getStayedAtArmory() { return stayedAtArmory; }
+void SupplyNPC::setStayedAtArmory(bool stayed) { stayedAtArmory = stayed; }
 
-WarriorNPC *LogisticNPC::FindWarriorNeedingAmmo() {
+WarriorNPC *SupplyNPC::FindWarriorNeedingAmmo() {
   if (!myTeam)
     return nullptr;
   WarriorNPC *worst = nullptr;
@@ -44,7 +44,7 @@ WarriorNPC *LogisticNPC::FindWarriorNeedingAmmo() {
   return worst;
 }
 
-void LogisticNPC::DoSomeWork() {
+void SupplyNPC::DoSomeWork() {
   // Autonomous: if no warrior assigned and have ammo, scan warriors
   scanCooldown--;
   if (!pWarrior && ammo >= AMMO_MAX * 0.3 && !isFillingAmmo &&
@@ -53,7 +53,7 @@ void LogisticNPC::DoSomeWork() {
     if (needy) {
       pWarrior = needy;
       std::string color = (team == 1 ? TEAM1 : TEAM2);
-      std::cout << color << "Logistic team " << team
+      std::cout << color << "Supply team " << team
                 << ": detected warrior needing ammo, going to supply!" << RESET
                 << std::endl;
 
@@ -110,7 +110,7 @@ void LogisticNPC::DoSomeWork() {
   }
 }
 
-void LogisticNPC::show() {
+void SupplyNPC::show() {
   NPC::show();
   double size = 3.0;
   const double barW = 0.35;

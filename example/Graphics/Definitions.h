@@ -34,8 +34,8 @@ const int WARRIOR_2_1 = 12;
 const int WARRIOR_2_2 = 13;
 const int MEDIC_1 = 14;
 const int MEDIC_2 = 15;
-const int LOGISTIC_1 = 16;
-const int LOGISTIC_2 = 17;
+const int SUPPLY_1 = 16;
+const int SUPPLY_2 = 17;
 
 // Maze / Room constants
 const int GRID_ROWS = 3;

@@ -1,24 +1,21 @@
 #include "FillAmmo.h"
 #include "NPC.h"
-#include "LogisticNPC.h"
+#include "SupplyNPC.h"
 
-void FillAmmo::OnEnter(NPC* pn)
-{
-	if (auto ln = dynamic_cast<LogisticNPC*>(pn)) {
-		ln->setIsFillingAmmo(true);
-	}
+void FillAmmo::OnEnter(NPC *pn) {
+  if (auto ln = dynamic_cast<SupplyNPC *>(pn)) {
+    ln->setIsFillingAmmo(true);
+  }
 }
 
-void FillAmmo::Transition(NPC* pn)
-{
-	OnExit(pn);
-	pn->setCurrentState(new GoToWarrior());
-	pn->getCurrentState()->OnEnter(pn);
+void FillAmmo::Transition(NPC *pn) {
+  OnExit(pn);
+  pn->setCurrentState(new GoToWarrior());
+  pn->getCurrentState()->OnEnter(pn);
 }
 
-void FillAmmo::OnExit(NPC* pn)
-{
-	if (auto ln = dynamic_cast<LogisticNPC*>(pn)) {
-		ln->setIsFillingAmmo(false);
-	}
+void FillAmmo::OnExit(NPC *pn) {
+  if (auto ln = dynamic_cast<SupplyNPC *>(pn)) {
+    ln->setIsFillingAmmo(false);
+  }
 }

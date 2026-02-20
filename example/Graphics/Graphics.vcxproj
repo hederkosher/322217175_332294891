@@ -134,7 +134,7 @@
     <ClCompile Include="GoToWarrior.cpp" />
     <ClCompile Include="Grenade.cpp" />
     <ClCompile Include="IdleState.cpp" />
-    <ClCompile Include="LogisticNPC.cpp" />
+    <ClCompile Include="SupplyNPC.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Map.cpp" />
     <ClCompile Include="MedicNPC.cpp" />
@@ -162,7 +162,7 @@
     <ClInclude Include="GoToWarrior.h" />
     <ClInclude Include="Grenade.h" />
     <ClInclude Include="IdleState.h" />
-    <ClInclude Include="LogisticNPC.h" />
+    <ClInclude Include="SupplyNPC.h" />
     <ClInclude Include="Map.h" />
     <ClInclude Include="MedicNPC.h" />
     <ClInclude Include="MoveToTargetState.h" />

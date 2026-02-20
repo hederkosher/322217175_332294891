@@ -1,21 +1,13 @@
 #include "IdleState.h"
 #include "NPC.h"
-#include "LogisticNPC.h"
+#include "SupplyNPC.h"
 
-void IdleState::OnEnter(NPC* pn)
-{
-    pn->setIsMoving(false);
-}
+void IdleState::OnEnter(NPC *pn) { pn->setIsMoving(false); }
 
-void IdleState::Transition(NPC* pn)
-{
-    OnExit(pn);
-}
+void IdleState::Transition(NPC *pn) { OnExit(pn); }
 
-void IdleState::OnExit(NPC* pn)
-{
-    if (auto Logistic = dynamic_cast<LogisticNPC*>(pn))
-    {
-        pn->setIsMoving(true);
-    }
+void IdleState::OnExit(NPC *pn) {
+  if (auto supply = dynamic_cast<SupplyNPC *>(pn)) {
+    pn->setIsMoving(true);
+  }
 }

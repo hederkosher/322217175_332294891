@@ -22,7 +22,7 @@ const int H = 600;
 NPC *team1[TEAM_SIZE];
 NPC *team2[TEAM_SIZE];
 
-enum NPCType { Warrior_1 = 0, Warrior_2 = 1, Medic = 2, Logistic = 3 };
+enum NPCType { Warrior_1 = 0, Warrior_2 = 1, Medic = 2, Supply = 3 };
 
 void drawText(double x, double y, const char *text, void *font) {
   glRasterPos2d(x, y);
