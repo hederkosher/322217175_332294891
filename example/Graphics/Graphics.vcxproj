@@ -122,7 +122,6 @@
     <ClCompile Include="AttackState.cpp" />
     <ClCompile Include="BFS.cpp" />
     <ClCompile Include="Bullet.cpp" />
-    <ClCompile Include="CommanderNPC.cpp" />
     <ClCompile Include="FillAmmo.cpp" />
     <ClCompile Include="FillMedicine.cpp" />
     <ClCompile Include="GiveAmmo.cpp" />
@@ -149,7 +148,6 @@
     <ClInclude Include="AttackState.h" />
     <ClInclude Include="BFS.h" />
     <ClInclude Include="Bullet.h" />
-    <ClInclude Include="CommanderNPC.h" />
     <ClInclude Include="Definitions.h" />
     <ClInclude Include="FillAmmo.h" />
     <ClInclude Include="FillMedicine.h" />
