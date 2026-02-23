@@ -1,6 +1,5 @@
 #include "GoToDefenseState.h"
 #include "BFS.h"
-#include "IdleState.h"
 #include "NPC.h"
 
 void GoToDefenseState::OnEnter(NPC* pn)
@@ -21,11 +20,14 @@ void GoToDefenseState::OnEnter(NPC* pn)
 
 void GoToDefenseState::Transition(NPC* pn)
 {
+    // When we arrive at cover, stay in this state (hold at cover) instead of going Idle.
+    // Otherwise we'd go Idle -> next frame EvaluatePriorities sees critical HP and
+    // switches back to FLEEING -> infinite loop of FLEEING / searching room.
     if (pn->getIsMoving() && pn->getPathIndex() == -1)
     {
-        OnExit(pn);
-        pn->setCurrentState(new IdleState());
-        pn->getCurrentState()->OnEnter(pn);
+        pn->setIsMoving(false);
+        pn->setPath({});
+        // Stay in GoToDefenseState so we don't trigger re-flee or search logic
     }
 }
 

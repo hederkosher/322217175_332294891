@@ -121,18 +121,30 @@ bool NPC::PlanPathTo() {
 	int sj = int(y);
 	std::vector<std::pair<int, int>> p;
 
-	if (FindPath(si, sj, ti, tj, p)) {
+	bool ok = (myTeam || enemyTeam)
+		? FindPath(si, sj, ti, tj, p, myTeam, enemyTeam, this)
+		: FindPath(si, sj, ti, tj, p);
+	if (ok) {
 		path.swap(p);
-		pathIndex = (path.size() > 1) ? 1 : -1;
+		// Start at 0 to follow first node; size-1 path still needs pathIndex=0 so we can arrive
+		pathIndex = path.empty() ? -1 : 0;
 		return true;
 	}
 
+	auto footprintOk = [](int i, int j) {
+		for (int a = 0; a < 3; a++)
+			for (int b = 0; b < 3; b++) {
+				int ni = i + a, nj = j + b;
+				if (ni < 0 || ni >= MSZ || nj < 0 || nj >= MSZ) return false;
+				if (map[ni][nj] == WALL || map[ni][nj] == STONE) return false;
+			}
+		return true;
+	};
 	int escape_moves[4][2] = { {-3, 0}, {0, 3}, {0, -3}, {3, 0} };
 	for (auto& move : escape_moves) {
 		int new_si = si + move[0];
 		int new_sj = sj + move[1];
-		if (new_si >= 0 && new_si < MSZ && new_sj >= 0 && new_sj < MSZ &&
-			map[new_si][new_sj] != WALL && map[new_si][new_sj] != STONE)
+		if (new_si >= 0 && new_si < MSZ && new_sj >= 0 && new_sj < MSZ && footprintOk(new_si, new_sj))
 		{
 			path.clear();
 			path.push_back({ si, sj });
@@ -142,6 +154,47 @@ bool NPC::PlanPathTo() {
 		}
 	}
 
+	path.clear();
+	pathIndex = -1;
+	return false;
+}
+
+bool NPC::PlanPathToIgnoreNPCs() {
+	int ti = int(targetX);
+	int tj = int(targetY);
+	int si = int(x);
+	int sj = int(y);
+	std::vector<std::pair<int, int>> p;
+	bool ok = FindPath(si, sj, ti, tj, p);
+	if (ok && !p.empty()) {
+		path.swap(p);
+		pathIndex = 0;
+		return true;
+	}
+<<<<<<< Current (Your changes)
+	auto footprintOk = [](int i, int j) {
+		for (int a = 0; a < 3; a++)
+			for (int b = 0; b < 3; b++) {
+				int ni = i + a, nj = j + b;
+				if (ni < 0 || ni >= MSZ || nj < 0 || nj >= MSZ) return false;
+				if (map[ni][nj] == WALL || map[ni][nj] == STONE) return false;
+			}
+		return true;
+	};
+	int escape_moves[4][2] = { {-3, 0}, {0, 3}, {0, -3}, {3, 0} };
+	for (auto& move : escape_moves) {
+		int new_si = si + move[0];
+		int new_sj = sj + move[1];
+		if (new_si >= 0 && new_si < MSZ && new_sj >= 0 && new_sj < MSZ && footprintOk(new_si, new_sj)) {
+			path.clear();
+			path.push_back({ si, sj });
+			path.push_back({ new_si, new_sj });
+			pathIndex = 1;
+			return true;
+		}
+	}
+=======
+>>>>>>> Incoming (Background Agent changes)
 	path.clear();
 	pathIndex = -1;
 	return false;
@@ -167,6 +220,7 @@ bool NPC::FollowPlannedPath(double minDist) {
 		pathIndex++;
 		if (pathIndex >= (int)path.size()) {
 			pathIndex = -1;
+			path.clear();  // so "stuck" logic sees no path and can request a new one
 			return true;
 		}
 	}
@@ -200,22 +254,22 @@ bool NPC::HasLineOfSight(double tX, double tY) const
 {
 	double startX = x + 1.5;
 	double startY = y + 1.5;
-	double currentX = startX;
-	double currentY = startY;
-
 	double dx = tX - startX;
 	double dy = tY - startY;
 	double distance = sqrt(dx * dx + dy * dy);
 
-	if (distance < 1.0) return true;
+	if (distance < 0.5) return true;
 
-	double stepX = (dx / distance) * 1.2;
-	double stepY = (dy / distance) * 1.5;
+	// Step along the line with symmetric step size (0.5 = ~half cell)
+	const double stepSize = 0.5;
+	int numSteps = static_cast<int>(distance / stepSize) + 1;
+	double stepX = (dx / distance) * stepSize;
+	double stepY = (dy / distance) * stepSize;
 
-	for (int i = 0; i < static_cast<int>(distance); ++i)
+	for (int i = 1; i <= numSteps; ++i)
 	{
-		currentX += stepX;
-		currentY += stepY;
+		double currentX = startX + stepX * i;
+		double currentY = startY + stepY * i;
 		int mapX = static_cast<int>(currentX);
 		int mapY = static_cast<int>(currentY);
 

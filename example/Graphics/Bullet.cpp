@@ -22,7 +22,7 @@ namespace {
     }
 }
 
-Bullet::Bullet(double xPos, double yPos, double angle, int team)
+Bullet::Bullet(double xPos, double yPos, double angle, int team, double damage, double radius)
 {
     x = xPos;
     y = yPos;
@@ -30,13 +30,13 @@ Bullet::Bullet(double xPos, double yPos, double angle, int team)
     dirY = sin(angle);
     isMoving = false;
     this->team = team;
+    damageAmount = damage;
+    drawRadius = radius;
 }
 
 void Bullet::Move(int map[MSZ][MSZ], NPC** team1, NPC** team2, double securityMap[MSZ][MSZ])
 {
     if (!isMoving) return;
-
-    const double DAMAGE_HP = 60.0;
     double nextX = x + SPEED * dirX;
     double nextY = y + SPEED * dirY;
 
@@ -63,7 +63,7 @@ void Bullet::Move(int map[MSZ][MSZ], NPC** team1, NPC** team2, double securityMa
     {
         if (CheckCollision(nextX, nextY, targetTeam[i]))
         {
-            targetTeam[i]->setHp(targetTeam[i]->getHp() - DAMAGE_HP);
+            targetTeam[i]->setHp(targetTeam[i]->getHp() - damageAmount);
             isMoving = false;
             return;
         }
@@ -79,10 +79,10 @@ void Bullet::Show()
     if (!isMoving) return;
     glColor3d(1, 0, 0);
     glBegin(GL_POLYGON);
-    glVertex2d(x - 0.5, y);
-    glVertex2d(x, y + 0.5);
-    glVertex2d(x + 0.5, y);
-    glVertex2d(x, y - 0.5);
+    glVertex2d(x - drawRadius, y);
+    glVertex2d(x, y + drawRadius);
+    glVertex2d(x + drawRadius, y);
+    glVertex2d(x, y - drawRadius);
     glEnd();
 }
 

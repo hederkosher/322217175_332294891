@@ -12,8 +12,7 @@ void GoToMedicine::OnEnter(NPC *pn) {
   pn->getPosition(px, py);
   double bestDist = 99999.0;
   int bestX = medicineX[0], bestY = medicineY[0];
-
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < numMedicine; i++) {
     double dx = medicineX[i] - px;
     double dy = medicineY[i] - py;
     double dist = dx * dx + dy * dy;

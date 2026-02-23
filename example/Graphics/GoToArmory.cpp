@@ -12,8 +12,7 @@ void GoToArmory::OnEnter(NPC* pn)
 	pn->getPosition(px, py);
 	double bestDist = 99999.0;
 	int bestX = armoryX[0], bestY = armoryY[0];
-
-	for (int i = 0; i < 2; i++) {
+	for (int i = 0; i < numArmories; i++) {
 		double dx = armoryX[i] - px;
 		double dy = armoryY[i] - py;
 		double dist = dx * dx + dy * dy;

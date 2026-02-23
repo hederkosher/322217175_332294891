@@ -16,6 +16,9 @@ const int AMMO_MAX = 100;
 const int MEDICINE_MAX = 100;
 const double SECURITY = 0.003;
 
+const double BULLET_DAMAGE = 60.0;
+const double GRENADE_BULLET_DAMAGE = MAX_HP * 0.01; 
+
 const int TEAM_SIZE = 4; // 2 Warriors + 1 Medic + 1 Supply
 
 const int MSZ = 100;
@@ -37,7 +40,6 @@ const int MEDIC_2 = 15;
 const int SUPPLY_1 = 16;
 const int SUPPLY_2 = 17;
 
-// Maze / Room constants
-const int GRID_ROWS = 3;
-const int GRID_COLS = 3;
-const int MAX_ROOMS = GRID_ROWS * GRID_COLS;
+// Maze / Room constants (actual count is random at runtime)
+const int MAX_ROOMS = 20;
+const int MAX_DEPOTS = 4;  // max armories + medicine depots each

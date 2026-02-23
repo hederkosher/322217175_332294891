@@ -30,6 +30,7 @@ public:
     void setStayedAtMedicine(bool stayed);
     void DoSomeWork();
     void setMedicine(double value);
+    double getMedicine() const { return medicine; }
     void show() override;
 
     // Autonomous teammate scanning

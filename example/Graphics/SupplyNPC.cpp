@@ -1,5 +1,8 @@
 #include "SupplyNPC.h"
 #include "GoToWarrior.h"
+#include "GoToDefenseState.h"
+#include "GoToArmory.h"
+#include "Map.h"
 #include <iostream>
 
 static int counter = 0;
@@ -33,7 +36,7 @@ WarriorNPC *SupplyNPC::FindWarriorNeedingAmmo() {
   // Warriors are at indices 0 and 1
   for (int i = 0; i < 2; i++) {
     if (auto w = dynamic_cast<WarriorNPC *>(myTeam[i])) {
-      if (w->getHp() > 0 && w->getAmmo() < AMMO_MAX / 3.0) {
+      if (w->getHp() > 0 && w->getAmmo() < AMMO_MAX * 0.6) {
         if (w->getAmmo() < worstAmmo) {
           worstAmmo = w->getAmmo();
           worst = w;
@@ -44,18 +47,62 @@ WarriorNPC *SupplyNPC::FindWarriorNeedingAmmo() {
   return worst;
 }
 
+WarriorNPC *SupplyNPC::FindWarriorWithLowestAmmo() {
+  if (!myTeam)
+    return nullptr;
+  WarriorNPC *lowest = nullptr;
+  double lowAmmo = AMMO_MAX + 1;
+
+  for (int i = 0; i < 2; i++) {
+    if (auto w = dynamic_cast<WarriorNPC *>(myTeam[i])) {
+      if (w->getHp() > 0 && w->getAmmo() < AMMO_MAX * 0.8 && w->getAmmo() < lowAmmo) {
+        lowAmmo = w->getAmmo();
+        lowest = w;
+      }
+    }
+  }
+  return lowest;
+}
+
 void SupplyNPC::DoSomeWork() {
-  // Autonomous: if no warrior assigned and have ammo, scan warriors
+  // When being shot (low HP), flee to cover and search for safety first
+  if (isInRisk() && !dynamic_cast<GoToDefenseState*>(pCurrentState)) {
+    if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+    pCurrentState = new GoToDefenseState();
+    pCurrentState->OnEnter(this);
+    std::string color = (team == 1 ? TEAM1 : TEAM2);
+    std::cout << color << "Supply team " << team << ": under fire, fleeing to cover!" << RESET << std::endl;
+    return;
+  }
+
+  // If we have a warrior target that's dead or full ammo, clear and go refill so we don't stand still
+  if (pWarrior && (pWarrior->getHp() <= 0 || pWarrior->getAmmo() >= AMMO_MAX)) {
+    pWarrior = nullptr;
+    setGoToWarrior(false);
+    supplyMessageShown = false;
+    if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+    pCurrentState = new GoToArmory();
+    pCurrentState->OnEnter(this);
+    return;
+  }
+
+  // Search for ammo at the beginning (GoToArmory state). After that, proactively search for soldiers to help.
   scanCooldown--;
-  if (!pWarrior && ammo >= AMMO_MAX * 0.3 && !isFillingAmmo &&
-      scanCooldown <= 0) {
+  double ammoThreshold = stayedAtArmory ? AMMO_MAX * 0.2 : AMMO_MAX * 0.3;  // after first fill, scan with less ammo
+  int cooldownAfterScan = stayedAtArmory ? 40 : 120;  // after first fill, search for warriors more often
+  if (!pWarrior && ammo >= ammoThreshold && !isFillingAmmo && scanCooldown <= 0) {
     WarriorNPC *needy = FindWarriorNeedingAmmo();
+    if (!needy)
+      needy = FindWarriorWithLowestAmmo();  // move toward team even if no one needs ammo yet
     if (needy) {
       pWarrior = needy;
-      std::string color = (team == 1 ? TEAM1 : TEAM2);
-      std::cout << color << "Supply team " << team
-                << ": detected warrior needing ammo, going to supply!" << RESET
-                << std::endl;
+      if (!supplyMessageShown) {
+        supplyMessageShown = true;
+        std::string color = (team == 1 ? TEAM1 : TEAM2);
+        std::cout << color << "Supply team " << team
+                  << ": detected warrior needing ammo, going to supply!" << RESET
+                  << std::endl;
+      }
 
       if (pCurrentState) {
         pCurrentState->OnExit(this);
@@ -64,7 +111,7 @@ void SupplyNPC::DoSomeWork() {
       pCurrentState = new GoToWarrior();
       pCurrentState->OnEnter(this);
     }
-    scanCooldown = 120;
+    scanCooldown = cooldownAfterScan;
   }
 
   if (isMoving && !isGettingHp) {
@@ -75,6 +122,28 @@ void SupplyNPC::DoSomeWork() {
       if (counter % 50 == 0)
         PlanPathTo();
       counter++;
+    } else if (dynamic_cast<GoToArmory *>(pCurrentState) &&
+               (path.empty() || pathIndex < 0)) {
+      counter++;
+      if (counter % 30 == 0 && numArmories > 0) {
+        // Retry path to armory if initial plan failed
+        double px, py;
+        getPosition(px, py);
+        double bestDist = 99999.0;
+        int bestX = armoryX[0], bestY = armoryY[0];
+        for (int i = 0; i < numArmories; i++) {
+          double dx = armoryX[i] - px;
+          double dy = armoryY[i] - py;
+          double dist = dx * dx + dy * dy;
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestX = armoryX[i];
+            bestY = armoryY[i];
+          }
+        }
+        setTarget(bestX, bestY);
+        PlanPathTo();
+      }
     }
 
     if (FollowPlannedPath(1)) {
@@ -85,7 +154,8 @@ void SupplyNPC::DoSomeWork() {
   if (isFillingAmmo) {
     if (ammo < AMMO_MAX) {
       ammo += 0.1;
-    } else if (pWarrior) {
+    } else {
+      // Done filling: always leave FillAmmo and go search for soldiers to help (GoToWarrior)
       pCurrentState->Transition(this);
     }
   }
@@ -102,9 +172,12 @@ void SupplyNPC::DoSomeWork() {
     if (pWarrior && pWarrior->getAmmo() < AMMO_MAX) {
       pWarrior->setAmmo(pWarrior->getAmmo() + 0.1);
       ammo -= 0.1;
-      if (ammo <= 0)
+      if (ammo <= 0) {
+        supplyMessageShown = false;
         pCurrentState->Transition(this);
+      }
     } else {
+      supplyMessageShown = false;
       pCurrentState->Transition(this);
     }
   }

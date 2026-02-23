@@ -16,8 +16,47 @@ Room rooms[MAX_ROOMS];
 int numRooms = 0;
 int roomId[MSZ][MSZ] = {0};
 
-int armoryX[2], armoryY[2];
-int medicineX[2], medicineY[2];
+int numArmories = 0;
+int numMedicine = 0;
+int armoryX[MAX_DEPOTS], armoryY[MAX_DEPOTS];
+int medicineX[MAX_DEPOTS], medicineY[MAX_DEPOTS];
+
+bool HasLineOfSight(double x1, double y1, double x2, double y2) {
+  int x0 = (int)(x1 + 1.5);
+  int y0 = (int)(y1 + 1.5);
+  int xEnd = (int)(x2 + 1.5);
+  int yEnd = (int)(y2 + 1.5);
+
+  int dx = abs(xEnd - x0);
+  int dy = -abs(yEnd - y0);
+  int sx = (x0 < xEnd) ? 1 : -1;
+  int sy = (y0 < yEnd) ? 1 : -1;
+  int err = dx + dy;
+
+  while (true) {
+    if (x0 < 0 || x0 >= MSZ || y0 < 0 || y0 >= MSZ)
+      return false;
+    if (map[x0][y0] == WALL || map[x0][y0] == STONE)
+      return false;
+    if (x0 == xEnd && y0 == yEnd)
+      break;
+    int e2 = 2 * err;
+    if (e2 >= dy) { err += dy; x0 += sx; }
+    if (e2 <= dx) { err += dx; y0 += sy; }
+  }
+  return true;
+}
+
+bool RoomHasEnemies(int rId, NPC **enemyTeam) {
+  if (!enemyTeam || rId <= 0) return false;
+  for (int i = 0; i < TEAM_SIZE; i++) {
+    if (enemyTeam[i] && enemyTeam[i]->getHp() > 0) {
+      if (enemyTeam[i]->getCurrentRoom() == rId)
+        return true;
+    }
+  }
+  return false;
+}
 
 int GetRoomAt(double x, double y) {
   int ix = (int)x;
@@ -40,12 +79,12 @@ Room *GetRoomById(int id) {
   return nullptr;
 }
 
-// Carve a horizontal corridor segment (3 cells wide)
+// Carve a horizontal corridor segment (5 cells wide - allows 3x3 NPCs to pass)
 static void CarveHorizontalCorridor(int x1, int x2, int y) {
   int minX = min(x1, x2);
   int maxX = max(x1, x2);
   for (int i = minX; i <= maxX; i++) {
-    for (int w = -1; w <= 1; w++) {
+    for (int w = -2; w <= 2; w++) {
       int j = y + w;
       if (i >= 0 && i < MSZ && j >= 0 && j < MSZ) {
         if (map[i][j] == WALL) {
@@ -56,12 +95,12 @@ static void CarveHorizontalCorridor(int x1, int x2, int y) {
   }
 }
 
-// Carve a vertical corridor segment (3 cells wide)
+// Carve a vertical corridor segment (5 cells wide - allows 3x3 NPCs to pass)
 static void CarveVerticalCorridor(int x, int y1, int y2) {
   int minY = min(y1, y2);
   int maxY = max(y1, y2);
   for (int j = minY; j <= maxY; j++) {
-    for (int w = -1; w <= 1; w++) {
+    for (int w = -2; w <= 2; w++) {
       int i = x + w;
       if (i >= 0 && i < MSZ && j >= 0 && j < MSZ) {
         if (map[i][j] == WALL) {
@@ -109,61 +148,58 @@ static void PlaceObstaclesInRoom(const Room &room) {
   }
 }
 
-// Place armory and medicine depots randomly in rooms
+// Place armory and medicine depots randomly in rooms (random counts)
 static void PlaceDepots() {
-  int usedRooms[4] = {-1, -1, -1, -1};
+  numArmories = 1;  // 1 ammo pack on the map
+  numMedicine = 1;  // 1 med kit on the map
+  int usedRooms[MAX_DEPOTS * 2];
+  for (int i = 0; i < MAX_DEPOTS * 2; i++) usedRooms[i] = -1;
   int usedCount = 0;
 
-  // Place 2 armory depots
-  for (int d = 0; d < 2; d++) {
+  for (int d = 0; d < numArmories; d++) {
     int r;
     int attempts = 0;
     do {
       r = rand() % numRooms;
       attempts++;
-    } while (attempts < 100 && (r == usedRooms[0] || r == usedRooms[1] ||
-                                r == usedRooms[2] || r == usedRooms[3]));
-
+      bool used = false;
+      for (int i = 0; i < usedCount; i++) if (usedRooms[i] == r) { used = true; break; }
+      if (used) r = -1;
+    } while (attempts < 100 && r < 0);
+    if (r < 0) r = 0;
     usedRooms[usedCount++] = r;
-
     int roomW = rooms[r].x2 - rooms[r].x1 + 1;
     int roomH = rooms[r].y2 - rooms[r].y1 + 1;
     int ox = rooms[r].x1 + 3 + rand() % max(1, roomW - 8);
     int oy = rooms[r].y1 + 3 + rand() % max(1, roomH - 8);
-
     armoryX[d] = ox;
     armoryY[d] = oy;
-
     for (int i = 0; i < 3; i++)
       for (int j = 0; j < 3; j++)
-        if (ox + i < MSZ && oy + j < MSZ)
-          map[ox + i][oy + j] = ARMORY;
+        if (ox + i < MSZ && oy + j < MSZ) map[ox + i][oy + j] = ARMORY;
   }
 
-  // Place 2 medicine depots
-  for (int d = 0; d < 2; d++) {
+  for (int d = 0; d < numMedicine; d++) {
     int r;
     int attempts = 0;
     do {
       r = rand() % numRooms;
       attempts++;
-    } while (attempts < 100 && (r == usedRooms[0] || r == usedRooms[1] ||
-                                r == usedRooms[2] || r == usedRooms[3]));
-
+      bool used = false;
+      for (int i = 0; i < usedCount; i++) if (usedRooms[i] == r) { used = true; break; }
+      if (used) r = -1;
+    } while (attempts < 100 && r < 0);
+    if (r < 0) r = 0;
     usedRooms[usedCount++] = r;
-
     int roomW = rooms[r].x2 - rooms[r].x1 + 1;
     int roomH = rooms[r].y2 - rooms[r].y1 + 1;
     int ox = rooms[r].x1 + 3 + rand() % max(1, roomW - 8);
     int oy = rooms[r].y1 + 3 + rand() % max(1, roomH - 8);
-
     medicineX[d] = ox;
     medicineY[d] = oy;
-
     for (int i = 0; i < 3; i++)
       for (int j = 0; j < 3; j++)
-        if (ox + i < MSZ && oy + j < MSZ)
-          map[ox + i][oy + j] = MEDICINE;
+        if (ox + i < MSZ && oy + j < MSZ) map[ox + i][oy + j] = MEDICINE;
   }
 }
 
@@ -190,19 +226,13 @@ static bool FindSpawnInRoom(const Room &room, double &outX, double &outY) {
   return false;
 }
 
-// Place troops in rooms
+// Place troops in rooms (random spawn corners: each team gets a random room)
 static void PlaceTroops(NPC **team1, NPC **team2) {
-  // Team 1 spawns in a right-side room (column 2)
-  int rightRooms[] = {2, 5, 8};
-  int r1 = rightRooms[rand() % 3];
-  if (r1 >= numRooms)
-    r1 = numRooms - 1;
-
-  // Team 2 spawns in a left-side room (column 0)
-  int leftRooms[] = {0, 3, 6};
-  int r2 = leftRooms[rand() % 3];
-  if (r2 >= numRooms)
-    r2 = 0;
+  if (numRooms < 2) return;
+  int r1 = rand() % numRooms;
+  int r2 = rand() % numRooms;
+  while (r2 == r1 && numRooms > 1)
+    r2 = rand() % numRooms;
 
   double sx, sy;
 
@@ -235,9 +265,8 @@ static void PlaceTroops(NPC **team1, NPC **team2) {
   }
 }
 
-// Generate the maze with rooms and corridors
+// Generate the maze with rooms and corridors (random grid size = random room count)
 static void GenerateMaze() {
-  // Fill entire map with walls
   for (int i = 0; i < MSZ; i++)
     for (int j = 0; j < MSZ; j++) {
       map[i][j] = WALL;
@@ -245,60 +274,54 @@ static void GenerateMaze() {
     }
 
   numRooms = 0;
-  int sectorW = MSZ / GRID_COLS;
-  int sectorH = MSZ / GRID_ROWS;
+  int gridRows = 2 + rand() % 3;  // 2-4 rows
+  int gridCols = 2 + rand() % 3;  // 2-4 cols -> 4 to 16 rooms
+  int sectorW = MSZ / max(1, gridCols);
+  int sectorH = MSZ / max(1, gridRows);
 
-  // Create rooms in grid pattern
-  for (int row = 0; row < GRID_ROWS; row++) {
-    for (int col = 0; col < GRID_COLS; col++) {
+  for (int row = 0; row < gridRows; row++) {
+    for (int col = 0; col < gridCols; col++) {
       int sectorX = col * sectorW;
       int sectorY = row * sectorH;
 
-      int roomW = 14 + rand() % 8; // 14-21 cells
-      int roomH = 14 + rand() % 8;
-
-      if (roomW > sectorW - 4)
-        roomW = sectorW - 4;
-      if (roomH > sectorH - 4)
-        roomH = sectorH - 4;
+      int roomW = 10 + rand() % 10;
+      int roomH = 10 + rand() % 10;
+      if (roomW > sectorW - 4) roomW = sectorW - 4;
+      if (roomH > sectorH - 4) roomH = sectorH - 4;
+      roomW = max(8, roomW);
+      roomH = max(8, roomH);
 
       int marginX = max(0, sectorW - roomW - 4);
       int marginY = max(0, sectorH - roomH - 4);
-
       int roomX = sectorX + 2 + (marginX > 0 ? rand() % marginX : 0);
       int roomY = sectorY + 2 + (marginY > 0 ? rand() % marginY : 0);
 
-      // Clamp to map bounds
-      if (roomX + roomW >= MSZ)
-        roomW = MSZ - roomX - 1;
-      if (roomY + roomH >= MSZ)
-        roomH = MSZ - roomY - 1;
+      if (roomX + roomW >= MSZ) roomW = MSZ - roomX - 1;
+      if (roomY + roomH >= MSZ) roomH = MSZ - roomY - 1;
+      if (roomW < 8 || roomH < 8) continue;
 
       int id = numRooms + 1;
-      rooms[numRooms] = {id, roomX, roomY, roomX + roomW - 1,
-                         roomY + roomH - 1};
-
+      rooms[numRooms] = {id, roomX, roomY, roomX + roomW - 1, roomY + roomH - 1};
       for (int i = roomX; i < roomX + roomW; i++)
         for (int j = roomY; j < roomY + roomH; j++) {
           map[i][j] = FLOOR;
           roomId[i][j] = id;
         }
-
       numRooms++;
     }
   }
 
-  // Connect adjacent rooms with corridors
-  for (int row = 0; row < GRID_ROWS; row++) {
-    for (int col = 0; col < GRID_COLS; col++) {
-      int idx = row * GRID_COLS + col;
-      if (col < GRID_COLS - 1) {
-        int rightIdx = row * GRID_COLS + (col + 1);
-        ConnectRooms(rooms[idx], rooms[rightIdx]);
+  for (int row = 0; row < gridRows; row++) {
+    for (int col = 0; col < gridCols; col++) {
+      int idx = row * gridCols + col;
+      if (idx >= numRooms) break;
+      if (col < gridCols - 1) {
+        int rightIdx = row * gridCols + (col + 1);
+        if (rightIdx < numRooms) ConnectRooms(rooms[idx], rooms[rightIdx]);
       }
-      if (row < GRID_ROWS - 1) {
-        int bottomIdx = (row + 1) * GRID_COLS + col;
-        ConnectRooms(rooms[idx], rooms[bottomIdx]);
+      if (row < gridRows - 1) {
+        int bottomIdx = (row + 1) * gridCols + col;
+        if (bottomIdx < numRooms) ConnectRooms(rooms[idx], rooms[bottomIdx]);
       }
     }
   }
@@ -332,10 +355,10 @@ void DrawMap() {
         glColor3d(0.45, 0.42, 0.38);
         break;
       case ARMORY:
-        glColor3d(0.9, 0.75, 0.1); // gold for armory
+        glColor3d(0.45, 0.32, 0.22);  // brown box (ammo pack)
         break;
       case MEDICINE:
-        glColor3d(0.9, 0.2, 0.3); // red/pink for medicine
+        glColor3d(0.85, 0.15, 0.15);  // red box (health pack)
         break;
       default:
         glColor3d(0.2, 0.2, 0.25);
@@ -363,13 +386,23 @@ void DrawMap() {
     glEnd();
   }
 
-  // Draw 'A' on armories and '+' on medicine depots
-  glColor3d(0.0, 0.0, 0.0);
-  for (int d = 0; d < 2; d++) {
-    glRasterPos2d(armoryX[d] + 0.8, armoryY[d] + 0.8);
-    glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, 'A');
-
-    glRasterPos2d(medicineX[d] + 0.8, medicineY[d] + 0.8);
+  // Draw health packs: red box with white + in center; ammo packs: brown box with III
+  for (int d = 0; d < numArmories; d++) {
+    double cx = armoryX[d] + 1.5;
+    double cy = armoryY[d] + 1.5;
+    glColor3d(0.95, 0.9, 0.75);  // cream for III symbol
+    glRasterPos2d(cx - 0.35, cy + 0.25);
+    glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, 'I');
+    glRasterPos2d(cx - 0.1, cy + 0.25);
+    glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, 'I');
+    glRasterPos2d(cx + 0.15, cy + 0.25);
+    glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, 'I');
+  }
+  for (int d = 0; d < numMedicine; d++) {
+    double cx = medicineX[d] + 1.5;
+    double cy = medicineY[d] + 1.5;
+    glColor3d(1.0, 1.0, 1.0);  // white +
+    glRasterPos2d(cx - 0.15, cy + 0.25);
     glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, '+');
   }
 }

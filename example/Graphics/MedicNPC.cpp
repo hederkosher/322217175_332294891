@@ -1,5 +1,8 @@
 #include "MedicNPC.h"
 #include "GoToTarget.h"
+#include "GoToDefenseState.h"
+#include "GoToMedicine.h"
+#include "Map.h"
 #include <iostream>
 
 static int medic_counter = 0;
@@ -24,30 +27,61 @@ void MedicNPC::setIsFillingMedicine(bool isFill) { isFillingMedicine = isFill; }
 bool MedicNPC::getStayedAtMedicine() { return stayedAtMedicine; }
 void MedicNPC::setStayedAtMedicine(bool stayed) { stayedAtMedicine = stayed; }
 
+// Find an injured teammate (any HP < MAX_HP). Prefer most injured; prefer those not in rooms with enemies (avoid fights).
 NPC* MedicNPC::FindInjuredTeammate()
 {
 	if (!myTeam) return nullptr;
-	NPC* worst = nullptr;
-	double worstHp = MAX_HP;
+	NPC* bestSafe = nullptr;   // most injured in a room with no enemies
+	NPC* bestAny = nullptr;   // most injured in any room
+	double worstHpSafe = MAX_HP;
+	double worstHpAny = MAX_HP;
 
 	for (int i = 0; i < TEAM_SIZE; i++) {
-		if (myTeam[i] && myTeam[i] != this && myTeam[i]->getHp() > 0
-			&& myTeam[i]->getHp() < MAX_HP * 0.5)
-		{
-			if (myTeam[i]->getHp() < worstHp) {
-				worstHp = myTeam[i]->getHp();
-				worst = myTeam[i];
-			}
+		NPC* t = myTeam[i];
+		if (!t || t == this || t->getHp() <= 0 || t->getHp() >= MAX_HP)
+			continue;
+		double hp = t->getHp();
+		int room = t->getCurrentRoom();
+		bool roomHasEnemies = RoomHasEnemies(room, enemyTeam);
+
+		if (hp < worstHpAny) {
+			worstHpAny = hp;
+			bestAny = t;
+		}
+		if (!roomHasEnemies && hp < worstHpSafe) {
+			worstHpSafe = hp;
+			bestSafe = t;
 		}
 	}
-	return worst;
+	// Prefer injured in safe rooms; if none, go to most injured even in combat zone
+	return bestSafe ? bestSafe : bestAny;
 }
 
 void MedicNPC::DoSomeWork()
 {
-	// Autonomous: if no target and have medicine, scan teammates
+	// When being shot (low HP), flee to cover and search for safety first
+	if (isInRisk() && !dynamic_cast<GoToDefenseState*>(pCurrentState)) {
+		if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+		pCurrentState = new GoToDefenseState();
+		pCurrentState->OnEnter(this);
+		std::string color = (team == 1 ? TEAM1 : TEAM2);
+		std::cout << color << "Medic team " << team << ": under fire, fleeing to cover!" << RESET << std::endl;
+		return;
+	}
+
+	// If we have a target that's dead or fully healed, clear and go refill so we don't stand still
+	if (pTarget && (pTarget->getHp() <= 0 || pTarget->getHp() >= MAX_HP)) {
+		pTarget = nullptr;
+		setGoToTarget(false);
+		if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+		pCurrentState = new GoToMedicine();
+		pCurrentState->OnEnter(this);
+		return;
+	}
+
+	// Autonomous: search for injured teammates (including critical HP). Scan regularly.
 	scanCooldown--;
-	if (!pTarget && medicine >= MEDICINE_MAX * 0.3 && !isFillingMedicine && scanCooldown <= 0)
+	if (!pTarget && medicine >= MEDICINE_MAX * 0.2 && !isFillingMedicine && scanCooldown <= 0)
 	{
 		NPC* injured = FindInjuredTeammate();
 		if (injured) {
@@ -86,10 +120,10 @@ void MedicNPC::DoSomeWork()
 		{
 			medicine += 0.1;
 		}
-		else if (pTarget)
+		else
 		{
-			if (pTarget->getHp() < MAX_HP && pTarget->getHp() > 0)
-				pCurrentState->Transition(this);
+			// Done filling: always leave FillMedicine and go search for soldiers to help (GoToTarget)
+			pCurrentState->Transition(this);
 		}
 	}
 

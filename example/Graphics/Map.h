@@ -18,9 +18,17 @@ extern Room rooms[MAX_ROOMS];
 extern int numRooms;
 extern int roomId[MSZ][MSZ]; // 0 = wall/passage, >0 = room id
 
-// Depot positions (2 armories, 2 medicine depots)
-extern int armoryX[2], armoryY[2];
-extern int medicineX[2], medicineY[2];
+// Depot positions (counts and positions are random at runtime)
+extern int numArmories;
+extern int numMedicine;
+extern int armoryX[MAX_DEPOTS], armoryY[MAX_DEPOTS];
+extern int medicineX[MAX_DEPOTS], medicineY[MAX_DEPOTS];
+
+// Line-of-sight: true if no WALL or STONE between (x1,y1) and (x2,y2)
+bool HasLineOfSight(double x1, double y1, double x2, double y2);
+
+// True if any living enemy is in this room (for medics/supply to avoid fights)
+bool RoomHasEnemies(int roomId, NPC **enemyTeam);
 
 // Room utility functions
 int GetRoomAt(double x, double y);

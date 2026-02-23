@@ -1,10 +1,32 @@
 #include "AStar.h"
+#include "NPC.h"
 #include <queue>
 #include <cmath>
 #include <limits>
 
 extern int map[MSZ][MSZ];
 extern double securityMap[MSZ][MSZ];
+
+static bool isCellOccupiedByOtherNPC(int i, int j, NPC **team1, NPC **team2,
+                                     NPC *exclude, int ti, int tj) {
+  for (int t = 0; t < 2; t++) {
+    NPC **team = (t == 0) ? team1 : team2;
+    if (!team) continue;
+    for (int k = 0; k < TEAM_SIZE; k++) {
+      NPC *n = team[k];
+      if (!n || n == exclude || n->getHp() <= 0) continue;
+      double px, py;
+      n->getPosition(px, py);
+      int fi = (int)px, fj = (int)py;
+      if (i >= fi && i < fi + 3 && j >= fj && j < fj + 3) {
+        if (ti >= fi && ti < fi + 3 && tj >= fj && tj < fj + 3)
+          continue;
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 static inline bool inBounds(int i, int j) {
     return i >= 0 && i < MSZ && j >= 0 && j < MSZ;
@@ -127,4 +149,94 @@ bool FindPath(int si, int sj, int ti, int tj, std::vector<std::pair<int, int>>& 
         }
     }
     return false;
+}
+
+bool FindPath(int si, int sj, int ti, int tj,
+              std::vector<std::pair<int, int>>& outPath,
+              NPC **team1, NPC **team2, NPC *exclude) {
+  outPath.clear();
+  if (!inBounds(si, sj) || !inBounds(ti, tj)) return false;
+
+  auto footprintFreeWithNPC = [&](int i, int j) {
+    for (int a = 0; a < 3; ++a) {
+      for (int b = 0; b < 3; ++b) {
+        int ni = i + a, nj = j + b;
+        if (cellBlockedOrOOB(ni, nj)) return false;
+        if (team1 || team2) {
+          if (isCellOccupiedByOtherNPC(ni, nj, team1, team2, exclude, ti, tj))
+            return false;
+        }
+      }
+    }
+    return true;
+  };
+
+  if (!footprintFreeWithNPC(si, sj) || !footprintFreeWithNPC(ti, tj))
+    return false;
+
+  static double gScore2[MSZ][MSZ];
+  static double fScore2[MSZ][MSZ];
+  static int pi2[MSZ][MSZ], pj2[MSZ][MSZ];
+  static bool closed2[MSZ][MSZ];
+
+  for (int i = 0; i < MSZ; ++i) {
+    for (int j = 0; j < MSZ; ++j) {
+      gScore2[i][j] = std::numeric_limits<double>::infinity();
+      fScore2[i][j] = std::numeric_limits<double>::infinity();
+      pi2[i][j] = pj2[i][j] = -1;
+      closed2[i][j] = false;
+    }
+  }
+
+  struct QItem { int i, j; double f; };
+  struct Cmp { bool operator()(const QItem& a, const QItem& b) const { return a.f > b.f; } };
+  std::priority_queue<QItem, std::vector<QItem>, Cmp> open;
+
+  gScore2[si][sj] = 0.0;
+  fScore2[si][sj] = heuristic(si, sj, ti, tj);
+  open.push(QItem{ si, sj, fScore2[si][sj] });
+
+  while (!open.empty()) {
+    QItem top = open.top();
+    open.pop();
+    int ci = top.i, cj = top.j;
+
+    if (closed2[ci][cj]) continue;
+    closed2[ci][cj] = true;
+
+    if (ci == ti && cj == tj) {
+      std::vector<std::pair<int, int>> rev;
+      int qi = ti, qj = tj;
+      while (qi != -1 && qj != -1) {
+        rev.push_back({ qi, qj });
+        int nqi = pi2[qi][qj], nqj = pj2[qi][qj];
+        qi = nqi; qj = nqj;
+      }
+      outPath.assign(rev.rbegin(), rev.rend());
+      return true;
+    }
+
+    for (int k = 0; k < DIRS; ++k) {
+      int ni = ci + di[k], nj = cj + dj[k];
+      if (!inBounds(ni, nj)) continue;
+      if (!footprintFreeWithNPC(ni, nj)) continue;
+      int sdi = ni - ci, sdj = nj - cj;
+      if (sdi != 0 && sdj != 0) {
+        if (!footprintFreeWithNPC(ci, cj + sdj)) continue;
+        if (!footprintFreeWithNPC(ci + sdi, cj)) continue;
+      }
+
+      double base = stepCost(k);
+      double risk = 0.5 * (securityMap[ci][cj] + securityMap[ni][nj]);
+      double cost = base * (1.0 + RISK_WEIGHT * risk);
+      double tentative = gScore2[ci][cj] + cost;
+      if (tentative < gScore2[ni][nj]) {
+        gScore2[ni][nj] = tentative;
+        fScore2[ni][nj] = tentative + heuristic(ni, nj, ti, tj);
+        pi2[ni][nj] = ci; pj2[ni][nj] = cj;
+        open.push(QItem{ ni, nj, fScore2[ni][nj] });
+      }
+    }
+  }
+  return false;
 }

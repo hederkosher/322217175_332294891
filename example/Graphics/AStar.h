@@ -3,6 +3,7 @@
 #include <utility>
 #include <vector>
 
+class NPC;
 
 struct AStarNode {
   int i, j;
@@ -14,3 +15,8 @@ struct AStarNode {
 bool FindPath(int si, int sj, // start (grid)
               int ti, int tj, // target (grid)
               std::vector<std::pair<int, int>> &outPath);
+
+// With NPC avoidance - treats other NPCs as obstacles so units don't block each other at entrances
+bool FindPath(int si, int sj, int ti, int tj,
+              std::vector<std::pair<int, int>> &outPath,
+              NPC **team1, NPC **team2, NPC *exclude);

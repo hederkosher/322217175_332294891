@@ -14,6 +14,11 @@ private:
   bool stayedAtArmory = false;
 
   int scanCooldown = 0;
+<<<<<<< Current (Your changes)
+  bool goingToSupplyMessageShown = false;
+=======
+  bool supplyMessageShown = false;
+>>>>>>> Incoming (Background Agent changes)
 
 public:
   SupplyNPC(double positionX, double positionY, char character, int team,
@@ -27,6 +32,7 @@ public:
   bool getIsFillingAmmo();
   void setIsFillingAmmo(bool isFill);
   void setAmmo(double value);
+  double getAmmo() const { return ammo; }
   bool getStayedAtArmory();
   void setStayedAtArmory(bool stayed);
   void DoSomeWork();
@@ -34,4 +40,6 @@ public:
 
   // Autonomous warrior scanning
   WarriorNPC *FindWarriorNeedingAmmo();
+  // Warrior with lowest ammo (any living warrior) - for moving toward team to resupply
+  WarriorNPC *FindWarriorWithLowestAmmo();
 };

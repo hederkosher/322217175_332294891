@@ -15,6 +15,9 @@ void MoveToTargetState::Transition(NPC* pn)
 {
 	if (auto warrior = dynamic_cast<WarriorNPC*>(pn))
 	{
+		// Don't switch to attack when critical HP/ammo - seeking medic/supply takes priority
+		if (warrior->isInRisk())
+			return;
 		// Room-based: only attack if enemy is in the same room
 		NPC* enemy = warrior->FindEnemyInSameRoom();
 		if (warrior->getAmmo() > 0 && enemy)

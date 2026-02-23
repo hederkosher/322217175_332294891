@@ -56,6 +56,7 @@ public:
 
   // A* pathfinding
   bool PlanPathTo();
+  bool PlanPathToIgnoreNPCs();  // fallback when stuck (no NPC avoidance)
   bool FollowPlannedPath(double minDist);
   void DrawPath() const;
 

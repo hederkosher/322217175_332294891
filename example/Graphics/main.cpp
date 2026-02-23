@@ -2,13 +2,16 @@
 #include "Definitions.h"
 #include "Grenade.h"
 #include "Map.h"
+#include "MedicNPC.h"
 #include "NPC.h"
 #include "SecurityMap.h"
+#include "SupplyNPC.h"
 #include "WarriorNPC.h"
 #include "glut.h"
 #include <iostream>
 #include <math.h>
 #include <stdlib.h>
+#include <sstream>
 #include <string>
 #include <time.h>
 
@@ -33,8 +36,8 @@ void drawText(double x, double y, const char *text, void *font) {
 }
 
 void init() {
-  srand(1796);
-  glClearColor(0, 0.5, 0.8, 0);
+  srand((unsigned)time(nullptr));
+  glClearColor(0.0f, 0.5f, 0.8f, 0.0f);
   glOrtho(0, 100, 0, 100, -1, 1);
   InitMap(team1, team2);
   CreateSecurityMap();
@@ -50,7 +53,7 @@ void init() {
 
   cout << TEAM1 << "Team 1: 2 Warriors + 1 Medic + 1 Supply" << RESET << endl;
   cout << TEAM2 << "Team 2: 2 Warriors + 1 Medic + 1 Supply" << RESET << endl;
-  cout << "Map: " << numRooms << " rooms connected by passages" << endl;
+  cout << "Map: " << numRooms << " rooms, " << numArmories << " armories, " << numMedicine << " medicine depots" << endl;
 }
 
 void showBullet(NPCType warrior, NPC **team) {
@@ -64,6 +67,43 @@ void showGranade(NPCType warrior, NPC **team) {
   if (auto wn = dynamic_cast<WarriorNPC *>(team[warrior])) {
     if (wn->getGrenade())
       wn->getGrenade()->Show();
+  }
+}
+
+static void DrawTeamStats(NPC **team, double x, int teamNum) {
+  void *font = GLUT_BITMAP_9_BY_15;
+  double y = 98.0;
+  if (teamNum == 1)
+    glColor3d(1.0, 0.6, 0.0);  // orange
+  else
+    glColor3d(0.0, 0.7, 1.0);  // light blue
+  glRasterPos2d(x, y);
+  std::string title = "Team " + std::to_string(teamNum);
+  for (char c : title) { glutBitmapCharacter(font, c); }
+  y -= 1.8;
+
+  glColor3d(0.0, 0.0, 0.0);
+  const char *labels[] = { "W1", "W2", "M", "P" };
+  for (int i = 0; i < TEAM_SIZE; i++) {
+    if (!team[i] || team[i]->getHp() <= 0) {
+      glRasterPos2d(x, y);
+      std::string line = std::string(labels[i]) + ": DEAD";
+      for (char c : line) { glutBitmapCharacter(font, c); }
+      y -= 1.8;
+      continue;
+    }
+    std::ostringstream line;
+    line << labels[i] << ": " << (int)team[i]->getHp() << " HP";
+    if (auto w = dynamic_cast<WarriorNPC *>(team[i]))
+      line << "  " << (int)w->getAmmo() << " Ammo";
+    else if (auto m = dynamic_cast<MedicNPC *>(team[i]))
+      line << "  " << (int)m->getMedicine() << " Med";
+    else if (auto s = dynamic_cast<SupplyNPC *>(team[i]))
+      line << "  " << (int)s->getAmmo() << " Pack";
+    std::string str = line.str();
+    glRasterPos2d(x, y);
+    for (char c : str) { glutBitmapCharacter(font, c); }
+    y -= 1.8;
   }
 }
 
@@ -88,6 +128,10 @@ void display() {
   showGranade(NPCType::Warrior_2, team1);
   showGranade(NPCType::Warrior_1, team2);
   showGranade(NPCType::Warrior_2, team2);
+
+  // Team stats in top corners
+  DrawTeamStats(team1, 2.0, 1);
+  DrawTeamStats(team2, 62.0, 2);
 
   if (gameWinner != 0) {
     glColor3d(0.0, 0.0, 0.0);

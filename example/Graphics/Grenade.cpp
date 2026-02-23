@@ -1,4 +1,5 @@
 #include "Grenade.h"
+#include "Definitions.h"
 #include <cmath>
 
 const double PI = 3.14;
@@ -11,7 +12,7 @@ Grenade::Grenade(double xPos, double yPos, int team)
 
 	for (i = 0, angle = 0; i < NUM_BULLETS; i++, angle += teta)
 	{
-		bullets[i] = new Bullet(x, y, angle, team);
+		bullets[i] = new Bullet(x, y, angle, team, GRENADE_BULLET_DAMAGE, 1.0);
 	}
 	isExploded = false;
 	this->team = team;
