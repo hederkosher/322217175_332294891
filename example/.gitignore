@@ -7,6 +7,7 @@
 *.obj
 *.exe
 *.pdb
+Graphics/Debug/Graphics.log
 Graphics/Debug/Graphics.exe
 Graphics/Debug/Graphics.pdb
 Graphics/Debug/Graphics.ilk
