@@ -97,7 +97,8 @@ void SupplyNPC::DoSomeWork() {
 
     // Follow path while fleeing
     if (isMoving && FollowPlannedPath(1)) {
-      pCurrentState->Transition(this);
+      if (pCurrentState)
+        pCurrentState->Transition(this);
     }
     return;
   }
@@ -146,7 +147,8 @@ void SupplyNPC::DoSomeWork() {
     }
 
     if (FollowPlannedPath(1)) {
-      pCurrentState->Transition(this);
+      if (pCurrentState)
+        pCurrentState->Transition(this);
     }
   }
 

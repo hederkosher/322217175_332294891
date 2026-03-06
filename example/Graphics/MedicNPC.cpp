@@ -82,7 +82,8 @@ void MedicNPC::DoSomeWork()
 
 		// Still follow path if moving to cover
 		if (isMoving && FollowPlannedPath(1)) {
-			pCurrentState->Transition(this);
+			if (pCurrentState)
+				pCurrentState->Transition(this);
 		}
 		return;
 	}
@@ -129,7 +130,8 @@ void MedicNPC::DoSomeWork()
 		}
 		if (FollowPlannedPath(1))
 		{
-			pCurrentState->Transition(this);
+			if (pCurrentState)
+				pCurrentState->Transition(this);
 		}
 	}
 

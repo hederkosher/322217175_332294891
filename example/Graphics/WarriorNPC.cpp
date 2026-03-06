@@ -97,7 +97,9 @@ void WarriorNPC::EvaluatePriorities() {
 
   // Priority 1: critical HP ? flee to cover or seek medic
   if (hpRatio < hpFleeThreshold) {
-    if (!dynamic_cast<GoToDefenseState *>(pCurrentState)) {
+    if (!dynamic_cast<GoToDefenseState *>(pCurrentState) &&
+        !dynamic_cast<IdleState *>(pCurrentState) &&
+        !dynamic_cast<MoveToTargetState *>(pCurrentState)) {
       if (!printedHpFleeMsg) {
         std::string color = (team == 1 ? TEAM1 : TEAM2);
         std::cout << color << "Warrior #" << npcType << " team " << team
@@ -138,6 +140,7 @@ void WarriorNPC::EvaluatePriorities() {
         fleeRepathCounter = 0;
       }
     }
+    return;
   } else {
     printedHpFleeMsg = false;
     // Recovery: HP is back above threshold, resume combat
