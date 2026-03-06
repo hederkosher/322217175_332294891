@@ -171,30 +171,6 @@ bool NPC::PlanPathToIgnoreNPCs() {
 		pathIndex = 0;
 		return true;
 	}
-<<<<<<< Current (Your changes)
-	auto footprintOk = [](int i, int j) {
-		for (int a = 0; a < 3; a++)
-			for (int b = 0; b < 3; b++) {
-				int ni = i + a, nj = j + b;
-				if (ni < 0 || ni >= MSZ || nj < 0 || nj >= MSZ) return false;
-				if (map[ni][nj] == WALL || map[ni][nj] == STONE) return false;
-			}
-		return true;
-	};
-	int escape_moves[4][2] = { {-3, 0}, {0, 3}, {0, -3}, {3, 0} };
-	for (auto& move : escape_moves) {
-		int new_si = si + move[0];
-		int new_sj = sj + move[1];
-		if (new_si >= 0 && new_si < MSZ && new_sj >= 0 && new_sj < MSZ && footprintOk(new_si, new_sj)) {
-			path.clear();
-			path.push_back({ si, sj });
-			path.push_back({ new_si, new_sj });
-			pathIndex = 1;
-			return true;
-		}
-	}
-=======
->>>>>>> Incoming (Background Agent changes)
 	path.clear();
 	pathIndex = -1;
 	return false;

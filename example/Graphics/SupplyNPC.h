@@ -14,11 +14,7 @@ private:
   bool stayedAtArmory = false;
 
   int scanCooldown = 0;
-<<<<<<< Current (Your changes)
-  bool goingToSupplyMessageShown = false;
-=======
   bool supplyMessageShown = false;
->>>>>>> Incoming (Background Agent changes)
 
 public:
   SupplyNPC(double positionX, double positionY, char character, int team,
