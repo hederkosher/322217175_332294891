@@ -113,6 +113,33 @@ int NPC::getCurrentRoom() const {
 	return GetRoomAt(x + 1.5, y + 1.5);
 }
 
+bool NPC::IsInCorridor() const {
+	int ix = (int)(x + 1.5);
+	int iy = (int)(y + 1.5);
+	if (ix >= 0 && ix < MSZ && iy >= 0 && iy < MSZ)
+		return roomId[ix][iy] == 0 && map[ix][iy] != WALL && map[ix][iy] != STONE;
+	return false;
+}
+
+void NPC::MoveToNearestRoom() {
+	double bestDist = 99999.0;
+	int bestIdx = -1;
+	for (int i = 0; i < numRooms; i++) {
+		double cx = rooms[i].centerX();
+		double cy = rooms[i].centerY();
+		double d = Distance(x, y, cx, cy);
+		if (d < bestDist) {
+			bestDist = d;
+			bestIdx = i;
+		}
+	}
+	if (bestIdx >= 0) {
+		setTarget(rooms[bestIdx].centerX(), rooms[bestIdx].centerY());
+		PlanPathTo();
+		isMoving = true;
+	}
+}
+
 bool NPC::PlanPathTo() {
 	int ti = int(targetX);
 	int tj = int(targetY);

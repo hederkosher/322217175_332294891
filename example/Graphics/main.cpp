@@ -8,6 +8,7 @@
 #include "glut.h"
 #include <iostream>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string>
 #include <time.h>
@@ -15,6 +16,9 @@
 using namespace std;
 
 int gameWinner = 0; // 0 = playing, 1 = team1, 2 = team2
+
+const int MATCH_DURATION_MS = 60000; // 1 minute
+int gameStartTime = 0;
 
 const int W = 900;
 const int H = 600;
@@ -52,6 +56,9 @@ void init() {
   cout << TEAM1 << "Team 1: 2 Warriors + 1 Medic + 1 Supply" << RESET << endl;
   cout << TEAM2 << "Team 2: 2 Warriors + 1 Medic + 1 Supply" << RESET << endl;
   cout << "Map: " << numRooms << " rooms connected by passages" << endl;
+  cout << "Match duration: 60 seconds" << endl;
+
+  gameStartTime = glutGet(GLUT_ELAPSED_TIME);
 }
 
 void showBullet(NPCType warrior, NPC **team) {
@@ -89,6 +96,20 @@ void display() {
   showGranade(NPCType::Warrior_2, team1);
   showGranade(NPCType::Warrior_1, team2);
   showGranade(NPCType::Warrior_2, team2);
+
+  // Draw timer at top center
+  if (gameWinner == 0) {
+    int elapsed = glutGet(GLUT_ELAPSED_TIME) - gameStartTime;
+    int remaining = (MATCH_DURATION_MS - elapsed) / 1000;
+    if (remaining < 0) remaining = 0;
+    int mins = remaining / 60;
+    int secs = remaining % 60;
+    char timerBuf[16];
+    sprintf(timerBuf, "%d:%02d", mins, secs);
+
+    glColor3d(1.0, 1.0, 1.0);
+    drawText(46, 97, timerBuf, GLUT_BITMAP_TIMES_ROMAN_24);
+  }
 
   if (gameWinner != 0) {
     glColor3d(0.0, 0.0, 0.0);
@@ -158,41 +179,61 @@ void idle() {
     }
   }
 
-  // Win condition
-  bool team1Alive = false;
-  bool team2Alive = false;
+  // Win condition 1: a squad loses all its warriors
+  bool team1WarriorsAlive = (team1[0] != nullptr) || (team1[1] != nullptr);
+  bool team2WarriorsAlive = (team2[0] != nullptr) || (team2[1] != nullptr);
 
-  for (int i = 0; i < TEAM_SIZE; i++) {
-    if (team1[i] != nullptr) {
-      team1Alive = true;
-      break;
-    }
-  }
-  for (int i = 0; i < TEAM_SIZE; i++) {
-    if (team2[i] != nullptr) {
-      team2Alive = true;
-      break;
-    }
-  }
-
-  if (team1Alive && !team2Alive) {
-    gameWinner = 1;
-    cout << GAME_END
-         << "###############\n# GAME OVER   #\n# TEAM 1 WINS "
-            "#\n###############\n"
-         << RESET << endl;
-  } else if (!team1Alive && team2Alive) {
+  if (!team1WarriorsAlive && team2WarriorsAlive) {
     gameWinner = 2;
     cout << GAME_END
          << "###############\n# GAME OVER   #\n# TEAM 2 WINS "
-            "#\n###############\n"
+            "#\n# (warriors)  #\n###############\n"
          << RESET << endl;
-  } else if (!team1Alive && !team2Alive) {
+  } else if (team1WarriorsAlive && !team2WarriorsAlive) {
+    gameWinner = 1;
+    cout << GAME_END
+         << "###############\n# GAME OVER   #\n# TEAM 1 WINS "
+            "#\n# (warriors)  #\n###############\n"
+         << RESET << endl;
+  } else if (!team1WarriorsAlive && !team2WarriorsAlive) {
     gameWinner = 3;
     cout << GAME_END
          << "###############\n# GAME OVER   #\n#   DRAW!     "
             "#\n###############\n"
          << RESET << endl;
+  }
+
+  // Win condition 2: time limit (1 minute) -- team with more total HP wins
+  if (gameWinner == 0) {
+    int elapsed = glutGet(GLUT_ELAPSED_TIME) - gameStartTime;
+    if (elapsed >= MATCH_DURATION_MS) {
+      double team1HP = 0, team2HP = 0;
+      for (int i = 0; i < TEAM_SIZE; i++) {
+        if (team1[i]) team1HP += team1[i]->getHp();
+        if (team2[i]) team2HP += team2[i]->getHp();
+      }
+      if (team1HP > team2HP) {
+        gameWinner = 1;
+        cout << GAME_END
+             << "###############\n# TIME'S UP!  #\n# TEAM 1 WINS "
+                "#\n# (more HP)   #\n###############\n"
+             << RESET << endl;
+      } else if (team2HP > team1HP) {
+        gameWinner = 2;
+        cout << GAME_END
+             << "###############\n# TIME'S UP!  #\n# TEAM 2 WINS "
+                "#\n# (more HP)   #\n###############\n"
+             << RESET << endl;
+      } else {
+        gameWinner = 3;
+        cout << GAME_END
+             << "###############\n# TIME'S UP!  #\n#   DRAW!     "
+                "#\n###############\n"
+             << RESET << endl;
+      }
+      cout << "Team 1 total HP: " << (int)team1HP
+           << " | Team 2 total HP: " << (int)team2HP << endl;
+    }
   }
 
   if (gameWinner != 0)

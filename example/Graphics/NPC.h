@@ -82,4 +82,6 @@ public:
 
   // Room awareness
   int getCurrentRoom() const;
+  bool IsInCorridor() const;
+  void MoveToNearestRoom();
 };

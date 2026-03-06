@@ -265,6 +265,11 @@ void WarriorNPC::SearchForEnemies() {
 }
 
 void WarriorNPC::DoSomeWork() {
+  // Never idle in a corridor -- move to nearest room immediately
+  if (!isMoving && IsInCorridor()) {
+    MoveToNearestRoom();
+  }
+
   // Evaluate priorities (may force state transitions)
   EvaluatePriorities();
 
@@ -290,7 +295,8 @@ void WarriorNPC::DoSomeWork() {
 
   if (!isMoving && !isGettingHp && !isAttacking) {
     framesAtTarget++;
-    if (framesAtTarget > 120) {
+    int idleLimit = IsInCorridor() ? 1 : 120;
+    if (framesAtTarget > idleLimit) {
       framesAtTarget = 0;
       SearchForEnemies();
       if (pCurrentState) {

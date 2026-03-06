@@ -185,6 +185,7 @@ void MedicNPC::DoSomeWork()
 		&& medicine >= MEDICINE_MAX * 0.3 && myTeam)
 	{
 		followCooldown--;
+		int cooldownLimit = IsInCorridor() ? 0 : 60;
 		if (followCooldown <= 0)
 		{
 			NPC* nearest = nullptr;
@@ -206,9 +207,16 @@ void MedicNPC::DoSomeWork()
 				setTarget(wx, wy);
 				PlanPathTo();
 				isMoving = true;
+			} else if (IsInCorridor()) {
+				MoveToNearestRoom();
 			}
-			followCooldown = 60;
+			followCooldown = cooldownLimit;
 		}
+	}
+
+	// Catch-all: never idle in a corridor
+	if (!isMoving && IsInCorridor()) {
+		MoveToNearestRoom();
 	}
 }
 
