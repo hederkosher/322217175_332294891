@@ -116,120 +116,107 @@ bool WarriorNPC::FindVisibleEnemy(double &outX, double &outY) {
   return false;
 }
 
-void WarriorNPC::EvaluatePriorities() {
+// Explicit aspiration selection (spec: one goal at a time, high to low priority)
+WarriorNPC::Aspiration WarriorNPC::SelectAspiration() {
   double hpRatio = hp / MAX_HP;
   double ammoRatio = ammo / AMMO_MAX;
-
-  // Reset "message shown" when HP/ammo restored so we can announce again next time
-  if (hpRatio >= hpFleeThreshold)
-    lowHpMessageShown = false;
-  if (ammoRatio >= ammoFleeThreshold)
-    lowAmmoMessageShown = false;
-
-  // Priority 1: critical HP ? seek medic first, else flee to cover
-  if (hpRatio < hpFleeThreshold) {
-    bool medicReachable = myTeam && myTeam[2] && myTeam[2]->getHp() > 0 && medicGiveUpFrames <= 0;
-    if (medicReachable) {
-      // Prefer going to medic (switch if we're not already going to medic; re-path to medic is done in DoSomeWork)
-      if (!dynamic_cast<MoveToTargetState *>(pCurrentState)) {
-        if (!lowHpMessageShown)
-          lowHpMessageShown = true;
-        if (pCurrentState) {
-          pCurrentState->OnExit(this);
-          delete pCurrentState;
-        }
-        double mx, my;
-        myTeam[2]->getPosition(mx, my);
-        setTarget(mx, my);
-        PlanPathTo();
-        if (path.empty())
-          PlanPathToIgnoreNPCs();
-        pCurrentState = new MoveToTargetState();
-        pCurrentState->OnEnter(this);
-      }
-      return;
-    }
-    // No medic: flee to cover (stop shooting and run)
-    if (!dynamic_cast<GoToDefenseState *>(pCurrentState)) {
-      if (!lowHpMessageShown)
-        lowHpMessageShown = true;
-      setIsAttacking(false);
-      if (pCurrentState) {
-        pCurrentState->OnExit(this);
-        delete pCurrentState;
-      }
-      pCurrentState = new GoToDefenseState();
-      pCurrentState->OnEnter(this);
-      return;
-    }
-    // Already in GoToDefenseState - if stuck too long (BFS failed or arrived at cover),
-    // give up hiding and resume fighting instead of freezing forever
-    if (path.empty() && !isMoving && framesStuck > 90) {
-      if (pCurrentState) {
-        pCurrentState->OnExit(this);
-        delete pCurrentState;
-      }
-      pCurrentState = new MoveToTargetState();
-      pCurrentState->OnEnter(this);
-      SearchForEnemies();
-      framesStuck = 0;
-      // Fall through to lower priorities (attack enemies in room, etc.)
-    } else {
-      return;
-    }
+  // (1) HP < HP_panic -> Escape to cover
+  if (hpRatio < hpFleeThreshold)
+    return ASPIRATION_ESCAPE;
+  // (2) HP < HP_needHeal -> target Medic if reachable, else escape to cover (don't keep fighting when hurt)
+  if (hpRatio < HP_NEED_HEAL_RATIO) {
+    if (myTeam && myTeam[2] && myTeam[2]->getHp() > 0 && medicGiveUpFrames <= 0)
+      return ASPIRATION_HEAL;
+    return ASPIRATION_ESCAPE;  // medic dead or gave up -> run to cover, don't keep shooting
   }
-
-  // Priority 2: low ammo ? stop fighting and run to search for ammo guy (supply)
-  if (ammoRatio < ammoFleeThreshold) {
-    if (!dynamic_cast<MoveToTargetState *>(pCurrentState) ||
-        !myTeam || !myTeam[3] || myTeam[3]->getHp() <= 0) {
-      if (!lowAmmoMessageShown)
-        lowAmmoMessageShown = true;
-
-      if (pCurrentState) {
-        pCurrentState->OnExit(this);
-        delete pCurrentState;
-      }
-
-      if (myTeam && myTeam[3] && myTeam[3]->getHp() > 0) {
-        double lx, ly;
-        myTeam[3]->getPosition(lx, ly);
-        setTarget(lx, ly);
-        PlanPathTo();
-        pCurrentState = new MoveToTargetState();
-        pCurrentState->OnEnter(this);
-      } else {
-        // Supply dead — fight with remaining ammo instead of idling forever
-        pCurrentState = new MoveToTargetState();
-        pCurrentState->OnEnter(this);
-        SearchForEnemies();
-      }
-    }
-    return;
-  }
-
-  // Priority 3: enemy in same room ? attack
-  NPC *enemy = FindEnemyInSameRoom();
+  // (3) ammo < Ammo_needResupply -> target Supply
+  if (ammoRatio < ammoFleeThreshold && myTeam && myTeam[3] && myTeam[3]->getHp() > 0)
+    return ASPIRATION_RESUPPLY;
+  // (4) enemy known -> fight (pursue last-known / same room); else search
+  NPC* enemy = FindEnemyInSameRoom();
   if (enemy) {
     double ex, ey;
     enemy->getPosition(ex, ey);
     lastKnownEnemyX = ex + 1.5;
     lastKnownEnemyY = ey + 1.5;
+    return ASPIRATION_FIGHT;
   }
-  if (attackMsgCooldown > 0) attackMsgCooldown--;
-  if (grenadeMsgCooldown > 0) grenadeMsgCooldown--;
-  if (enemy && ammo > 0 && !dynamic_cast<AttackState *>(pCurrentState)) {
-    if (attackMsgCooldown <= 0)
-      attackMsgCooldown = 300;
-    if (pCurrentState) {
-      pCurrentState->OnExit(this);
-      delete pCurrentState;
+  if (lastKnownEnemyX >= 0 && lastKnownEnemyY >= 0)
+    return ASPIRATION_FIGHT;  // chase last-known
+  return ASPIRATION_SEARCH;
+}
+
+void WarriorNPC::ApplyAspiration(Aspiration a) {
+  if (a == ASPIRATION_ESCAPE) {
+    // Stuck in GoToDefenseState (BFS failed or no path) -> resume fight/search
+    if (dynamic_cast<GoToDefenseState*>(pCurrentState) && (path.empty() || pathIndex < 0) && !getIsMoving() && framesStuck > 90) {
+      if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+      pCurrentState = new MoveToTargetState();
+      pCurrentState->OnEnter(this);
+      SearchForEnemies();
+      framesStuck = 0;
+      return;
     }
-    pCurrentState = new AttackState();
+    // Already at cover (IdleState) or fleeing to cover (GoToDefenseState) -> stay
+    if (dynamic_cast<GoToDefenseState*>(pCurrentState) || dynamic_cast<IdleState*>(pCurrentState))
+      return;
+    if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+    pCurrentState = new GoToDefenseState();
     pCurrentState->OnEnter(this);
     return;
   }
-
+  if (a == ASPIRATION_HEAL) {
+    if (!dynamic_cast<MoveToTargetState*>(pCurrentState) || path.empty()) {
+      double mx, my;
+      myTeam[2]->getPosition(mx, my);
+      setTarget(mx, my);
+      PlanPathTo();
+      if (path.empty()) PlanPathToIgnoreNPCs();
+      if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+      pCurrentState = new MoveToTargetState();
+      pCurrentState->OnEnter(this);
+    }
+    return;
+  }
+  if (a == ASPIRATION_RESUPPLY) {
+    if (!dynamic_cast<MoveToTargetState*>(pCurrentState) || path.empty()) {
+      if (myTeam[3]) {
+        double lx, ly;
+        myTeam[3]->getPosition(lx, ly);
+        setTarget(lx, ly);
+        PlanPathTo();
+      }
+      if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+      pCurrentState = new MoveToTargetState();
+      pCurrentState->OnEnter(this);
+      if (path.empty()) SearchForEnemies();
+    }
+    return;
+  }
+  if (a == ASPIRATION_FIGHT) {
+    // MoveToTargetState::Transition will switch to AttackState when enemy in same room + LOS + ammo
+    if (lastKnownEnemyX >= 0 && lastKnownEnemyY >= 0 && !dynamic_cast<AttackState*>(pCurrentState)) {
+      bool inMoving = dynamic_cast<MoveToTargetState*>(pCurrentState);
+      if (!inMoving && !dynamic_cast<GoToDefenseState*>(pCurrentState)) {
+        setTarget(lastKnownEnemyX, lastKnownEnemyY);
+        PlanPathTo();
+        if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+        pCurrentState = new MoveToTargetState();
+        pCurrentState->OnEnter(this);
+      } else if (inMoving && (path.empty() || pathIndex < 0)) {
+        setTarget(lastKnownEnemyX, lastKnownEnemyY);
+        PlanPathTo();
+      }
+    }
+    return;
+  }
+  // ASPIRATION_SEARCH
+  if (!dynamic_cast<MoveToTargetState*>(pCurrentState) || (path.empty() && searchCooldown <= 0)) {
+    SearchForEnemies();
+    if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+    pCurrentState = new MoveToTargetState();
+    pCurrentState->OnEnter(this);
+  }
 }
 
 static bool isFootprintWalkable(int tx, int ty) {
@@ -351,7 +338,8 @@ void WarriorNPC::DoSomeWork() {
     fleeingGrenade = false;
   }
 
-  EvaluatePriorities();
+  // Explicit aspiration selection (spec: one goal per tick)
+  ApplyAspiration(SelectAspiration());
 
   if (pCurrentState)
     pCurrentState->Transition(this);
@@ -454,57 +442,60 @@ void WarriorNPC::DoSomeWork() {
   else
     framesStuck = 0;
 
-  // Attacking logic: when 2+ enemies in room throw grenade (more damage); else shoot bullet
+  // Fire mode (spec): grenade if (enemy behind cover OR >=2 enemies in blast OR enemy very close) and self at safe distance; else bullet
   // Never shoot when fleeing to cover (GoToDefenseState)
   if (isAttacking && !dynamic_cast<GoToDefenseState *>(pCurrentState)) {
     arrivedAtTarget = false;
     NPC *enemy = FindEnemyInSameRoom();
     int enemyCount = CountEnemiesInSameRoom();
     bool shotThisFrame = false;
+    double ex = 0, ey = 0;
+    if (enemy) enemy->getPosition(ex, ey);
+    double tx = ex + 1.5, ty = ey + 1.5;
+    double mx = x + 1.5, my = y + 1.5;
+    double distToEnemy = enemy ? sqrt((tx - mx)*(tx - mx) + (ty - my)*(ty - my)) : 999.0;
+    bool enemyBehindCover = enemy && !HasLineOfSight(tx, ty);
+    bool twoOrMoreInBlast = enemyCount >= 2;
+    bool enemyVeryClose = distToEnemy < 6.0;
+    const double GRENADE_SAFE_DIST = 5.0;
+    bool useGrenade = (enemyBehindCover || twoOrMoreInBlast || enemyVeryClose) && ammo >= 5 && !pGrenade && !grenadeThrownThisRound && distToEnemy >= GRENADE_SAFE_DIST;
 
-    if (enemyCount >= 2 && pGrenade == nullptr && ammo >= 5 && !grenadeThrownThisRound) {
-      double gx = 0, gy = 0;
-      int n = 0;
-      for (int i = 0; i < TEAM_SIZE; i++) {
-        if (enemyTeam[i] && enemyTeam[i]->getHp() > 0 &&
-            enemyTeam[i]->getCurrentRoom() == getCurrentRoom()) {
-          double ex, ey;
-          enemyTeam[i]->getPosition(ex, ey);
-          gx += ex + 1.5;
-          gy += ey + 1.5;
-          n++;
+    if (useGrenade) {
+      double gx = tx, gy = ty;
+      if (twoOrMoreInBlast) {
+        gx = gy = 0;
+        int n = 0;
+        for (int i = 0; i < TEAM_SIZE; i++) {
+          if (enemyTeam[i] && enemyTeam[i]->getHp() > 0 && enemyTeam[i]->getCurrentRoom() == getCurrentRoom()) {
+            double eex, eey;
+            enemyTeam[i]->getPosition(eex, eey);
+            gx += eex + 1.5; gy += eey + 1.5; n++;
+          }
         }
+        if (n > 0) { gx /= n; gy /= n; }
       }
-      if (n > 0) {
-        gx /= n;
-        gy /= n;
-        double dx = gx - (x + 1.5), dy = gy - (y + 1.5);
-        double dist = sqrt(dx*dx + dy*dy);
-        double tgx = gx, tgy = gy;
-        if (dist > 0.5) {
-          double perpX = -dy / dist, perpY = dx / dist;
-          double offset = 2.5 + (rand() % 100) / 50.0;
-          int side = (rand() % 2) ? 1 : -1;
-          tgx = gx + side * perpX * offset;
-          tgy = gy + side * perpY * offset;
-        }
-        if (HasLineOfSight(tgx, tgy)) {
-          pGrenade = new Grenade(x + 1.5, y + 1.5, tgx, tgy, team);
-          grenadeThrownThisRound = true;
-          if (grenadeMsgCooldown <= 0)
-            grenadeMsgCooldown = 300;
-          ammo -= 5;
-          shotThisFrame = true;
-        }
+      double dx = gx - mx, dy = gy - my;
+      double d = sqrt(dx*dx + dy*dy);
+      double tgx = gx, tgy = gy;
+      if (d > 0.5) {
+        double perpX = -dy / d, perpY = dx / d;
+        double offset = 2.5 + (rand() % 100) / 50.0;
+        int side = (rand() % 2) ? 1 : -1;
+        tgx = gx + side * perpX * offset; tgy = gy + side * perpY * offset;
       }
-    } else if (enemy && ammo > 0 && pGrenade == nullptr) {
-      double ex, ey;
-      enemy->getPosition(ex, ey);
-      double tx = ex + 1.5, ty = ey + 1.5;
+      if (HasLineOfSight(tgx, tgy)) {
+        pGrenade = new Grenade(mx, my, tgx, tgy, team);
+        grenadeThrownThisRound = true;
+        if (grenadeMsgCooldown <= 0) grenadeMsgCooldown = 300;
+        ammo -= 5;
+        shotThisFrame = true;
+      }
+    }
+    if (!shotThisFrame && enemy && ammo > 0 && pGrenade == nullptr) {
       if (HasLineOfSight(tx, ty)) {
-        double mx = x + 1.5, my = y + 1.5;
         double dx = tx - mx, dy = ty - my;
         double dist = sqrt(dx*dx + dy*dy);
+        if (dist < 0.001) dist = 0.001;
         double ax = tx, ay = ty;
         if (dist > 0.5) {
           ax = tx - 0.25 * (dx / dist);

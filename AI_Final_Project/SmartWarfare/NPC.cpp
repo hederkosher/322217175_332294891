@@ -1,8 +1,10 @@
 #include "NPC.h"
 #include "AStar.h"
 #include "Map.h"
+#include "PathfindingStats.h"
 #include "SecurityMap.h"
 #include "glut.h"
+#include <chrono>
 #include <cmath>
 #include <iostream>
 
@@ -122,31 +124,53 @@ int NPC::getCurrentRoom() const {
 int g_pathFindBudget = 2;
 
 bool NPC::PlanPathTo() {
-	if (g_pathFindBudget <= 0) return false;
-	g_pathFindBudget--;
+	// Per-unit replan cooldown: avoid replan storms
+	if (g_currentFrame - lastPlanFrame < REPLAN_COOLDOWN_FRAMES)
+		return false;
+
 	int ti = int(targetX);
 	int tj = int(targetY);
 	int si = int(x);
 	int sj = int(y);
 	std::vector<std::pair<int, int>> p;
+	bool ok = false;
 
-	bool ok = (myTeam || enemyTeam)
-		? FindPath(si, sj, ti, tj, p, myTeam, enemyTeam, this)
-		: FindPath(si, sj, ti, tj, p);
-	if (ok) {
-		path.swap(p);
-		pathIndex = path.empty() ? -1 : 0;
-		return true;
+	// Budget per A* run: first run consumes 1, fallback consumes 1 more if budget allows
+	if (g_pathFindBudget >= 1) {
+		g_pathFindBudget--;
+		g_lastPathRequesterTeam = g_currentPathRequesterTeam;
+		g_lastPathRequesterSlot = g_currentPathRequesterSlot;
+		{
+			auto t0 = std::chrono::high_resolution_clock::now();
+			ok = (myTeam || enemyTeam)
+				? FindPath(si, sj, ti, tj, p, myTeam, enemyTeam, this)
+				: FindPath(si, sj, ti, tj, p);
+			g_pathfindingMs += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t0).count();
+		}
+		if (ok) {
+			path.swap(p);
+			pathIndex = path.empty() ? -1 : 0;
+			lastPlanFrame = g_currentFrame;
+			return true;
+		}
 	}
 
-	// NPC-avoidance A* failed - try basic A* without avoidance before escape moves
+	// Fallback A* (no NPC avoidance) only if we have budget for a second run
 	if (myTeam || enemyTeam) {
 		p.clear();
-		ok = FindPath(si, sj, ti, tj, p);
-		if (ok && !p.empty()) {
-			path.swap(p);
-			pathIndex = 0;
-			return true;
+		if (g_pathFindBudget >= 1) {
+			g_pathFindBudget--;
+			g_lastPathRequesterTeam = g_currentPathRequesterTeam;
+			g_lastPathRequesterSlot = g_currentPathRequesterSlot;
+			auto t0 = std::chrono::high_resolution_clock::now();
+			ok = FindPath(si, sj, ti, tj, p);
+			g_pathfindingMs += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t0).count();
+			if (ok && !p.empty()) {
+				path.swap(p);
+				pathIndex = 0;
+				lastPlanFrame = g_currentFrame;
+				return true;
+			}
 		}
 	}
 
@@ -180,17 +204,24 @@ bool NPC::PlanPathTo() {
 }
 
 bool NPC::PlanPathToIgnoreNPCs() {
+	if (g_currentFrame - lastPlanFrame < REPLAN_COOLDOWN_FRAMES)
+		return false;
 	if (g_pathFindBudget <= 0) return false;
 	g_pathFindBudget--;
+	g_lastPathRequesterTeam = g_currentPathRequesterTeam;
+	g_lastPathRequesterSlot = g_currentPathRequesterSlot;
 	int ti = int(targetX);
 	int tj = int(targetY);
 	int si = int(x);
 	int sj = int(y);
 	std::vector<std::pair<int, int>> p;
+	auto t0 = std::chrono::high_resolution_clock::now();
 	bool ok = FindPath(si, sj, ti, tj, p);
+	g_pathfindingMs += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t0).count();
 	if (ok && !p.empty()) {
 		path.swap(p);
 		pathIndex = 0;
+		lastPlanFrame = g_currentFrame;
 		return true;
 	}
 	path.clear();

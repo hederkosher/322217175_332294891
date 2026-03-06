@@ -40,5 +40,9 @@ int GetRoomAt(double x, double y);
 bool AreInSameRoom(double x1, double y1, double x2, double y2);
 Room *GetRoomById(int id);
 
+// NPC occupancy grid: 0 = free, 1-4 = team1 slot 0-3, 5-8 = team2 slot 0-3. Updated once per tick for O(1) A* footprint checks.
+extern char npcOccupancyGrid[MSZ][MSZ];
+void UpdateNpcOccupancy(NPC **team1, NPC **team2);
+
 void InitMap(NPC **team1, NPC **team2);
 void DrawMap();

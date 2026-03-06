@@ -75,6 +75,9 @@ public:
     // Chase logic: last known enemy position when enemy fled
     double getLastKnownEnemyX() const { return lastKnownEnemyX; }
     double getLastKnownEnemyY() const { return lastKnownEnemyY; }
-    void EvaluatePriorities();
+    // Explicit aspiration selection (spec: one goal per tick)
+    enum Aspiration { ASPIRATION_ESCAPE, ASPIRATION_HEAL, ASPIRATION_RESUPPLY, ASPIRATION_FIGHT, ASPIRATION_SEARCH };
+    Aspiration SelectAspiration();
+    void ApplyAspiration(Aspiration a);
     void SearchForEnemies();
 };

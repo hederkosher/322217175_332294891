@@ -25,7 +25,15 @@ const double BULLET_DAMAGE = 60.0;
 const double GRENADE_BULLET_DAMAGE = MAX_HP * 0.01;
 
 // Support units (Medic, Supply) flee / avoid when an enemy is visible within this distance
-const double SUPPORT_AVOID_ENEMY_DIST = 22.0; 
+const double SUPPORT_AVOID_ENEMY_DIST = 22.0;
+
+// Aspiration / state thresholds (spec)
+const double HP_PANIC_RATIO = 0.25;       // HP below this -> escape to cover (GoToDefenseState)
+const double HP_NEED_HEAL_RATIO = 0.5;   // HP below this -> target Medic (when not panic)
+const double AMMO_NEED_RESUPPLY_RATIO = 0.2;  // Ammo below this -> target Supply
+const double HP_RECOVER_RATIO = 0.4;     // HP above this at cover -> leave defense (MoveToTargetState)
+const double HP_OK_RATIO = 0.9;          // Medic: stop healing when teammate reaches this (don't over-heal)
+const int CHASE_NO_ENEMY_FRAMES = 30;   // Frames without visible enemy before leaving AttackState (chase or search)
 
 const int TEAM_SIZE = 4; // 2 Warriors + 1 Medic + 1 Supply
 

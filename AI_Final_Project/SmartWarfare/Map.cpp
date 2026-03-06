@@ -24,6 +24,31 @@ int medicineX[MAX_DEPOTS], medicineY[MAX_DEPOTS];
 int armoryOccupiedBy[MAX_DEPOTS] = {};
 int medicineOccupiedBy[MAX_DEPOTS] = {};
 
+char npcOccupancyGrid[MSZ][MSZ] = {};
+
+void UpdateNpcOccupancy(NPC **team1, NPC **team2) {
+  for (int i = 0; i < MSZ; i++)
+    for (int j = 0; j < MSZ; j++)
+      npcOccupancyGrid[i][j] = 0;
+  for (int t = 0; t < 2; t++) {
+    NPC **team = (t == 0) ? team1 : team2;
+    if (!team) continue;
+    char idBase = (t == 0) ? 1 : 5;
+    for (int k = 0; k < TEAM_SIZE; k++) {
+      if (!team[k] || team[k]->getHp() <= 0) continue;
+      double px, py;
+      team[k]->getPosition(px, py);
+      int fi = (int)px, fj = (int)py;
+      for (int a = 0; a < 3; a++)
+        for (int b = 0; b < 3; b++) {
+          int ni = fi + a, nj = fj + b;
+          if (ni >= 0 && ni < MSZ && nj >= 0 && nj < MSZ)
+            npcOccupancyGrid[ni][nj] = idBase + k;
+        }
+    }
+  }
+}
+
 void ReleaseAllDepots() {
   for (int i = 0; i < MAX_DEPOTS; i++) {
     armoryOccupiedBy[i] = 0;

@@ -1,5 +1,7 @@
 #include "AStar.h"
+#include "Map.h"
 #include "NPC.h"
+#include "PathfindingStats.h"
 #include <queue>
 #include <cmath>
 #include <limits>
@@ -7,25 +9,17 @@
 extern int map[MSZ][MSZ];
 extern double securityMap[MSZ][MSZ];
 
-static bool isCellOccupiedByOtherNPC(int i, int j, NPC **team1, NPC **team2,
-                                     NPC *exclude, int ti, int tj) {
+// Get occupant id 1-8 for exclude so we can allow that NPC's footprint in the grid check
+static int getExcludeId(NPC **team1, NPC **team2, NPC *exclude) {
+  if (!exclude) return 0;
   for (int t = 0; t < 2; t++) {
     NPC **team = (t == 0) ? team1 : team2;
     if (!team) continue;
-    for (int k = 0; k < TEAM_SIZE; k++) {
-      NPC *n = team[k];
-      if (!n || n == exclude || n->getHp() <= 0) continue;
-      double px, py;
-      n->getPosition(px, py);
-      int fi = (int)px, fj = (int)py;
-      if (i >= fi && i < fi + 3 && j >= fj && j < fj + 3) {
-        if (ti >= fi && ti < fi + 3 && tj >= fj && tj < fj + 3)
-          continue;
-        return true;
-      }
-    }
+    for (int k = 0; k < TEAM_SIZE; k++)
+      if (team[k] == exclude)
+        return (t == 0 ? 1 : 5) + k;
   }
-  return false;
+  return 0;
 }
 
 static inline bool inBounds(int i, int j) {
@@ -106,10 +100,14 @@ bool FindPath(int si, int sj, int ti, int tj, std::vector<std::pair<int, int>>& 
     fScore[si][sj] = heuristic(si, sj, ti, tj);
     open.push(QItem{ si, sj, fScore[si][sj] });
 
-    static const int MAX_ASTAR_EXPANSIONS = 1200;  // cap cost so FPS stays high in late match
+    static const int MAX_ASTAR_EXPANSIONS = 800;  // cap for stability (was 1200)
     int expansions = 0;
+    g_astarCallsThisFrame++;
     while (!open.empty()) {
-        if (expansions++ >= MAX_ASTAR_EXPANSIONS) return false;
+        if (expansions++ >= MAX_ASTAR_EXPANSIONS) {
+            g_astarExpansionsThisFrame += expansions;
+            return false;
+        }
         QItem top = open.top();
         open.pop();
         int ci = top.i;
@@ -119,6 +117,7 @@ bool FindPath(int si, int sj, int ti, int tj, std::vector<std::pair<int, int>>& 
         closed[ci][cj] = true;
 
         if (ci == ti && cj == tj) {
+            g_astarExpansionsThisFrame += expansions;
             int qi = ti, qj = tj;
             std::vector<std::pair<int, int>> rev;
             while (qi != -1 && qj != -1) {
@@ -151,6 +150,7 @@ bool FindPath(int si, int sj, int ti, int tj, std::vector<std::pair<int, int>>& 
             }
         }
     }
+    g_astarExpansionsThisFrame += expansions;
     return false;
 }
 
@@ -160,15 +160,15 @@ bool FindPath(int si, int sj, int ti, int tj,
   outPath.clear();
   if (!inBounds(si, sj) || !inBounds(ti, tj)) return false;
 
+  int excludeId = getExcludeId(team1, team2, exclude);
+  // O(1) footprint check via occupancy grid (updated once per tick) instead of O(NPCs) per cell
   auto footprintFreeWithNPC = [&](int i, int j) {
     for (int a = 0; a < 3; ++a) {
       for (int b = 0; b < 3; ++b) {
         int ni = i + a, nj = j + b;
         if (cellBlockedOrOOB(ni, nj)) return false;
-        if (team1 || team2) {
-          if (isCellOccupiedByOtherNPC(ni, nj, team1, team2, exclude, ti, tj))
-            return false;
-        }
+        char occ = npcOccupancyGrid[ni][nj];
+        if (occ != 0 && occ != excludeId) return false;
       }
     }
     return true;
@@ -199,10 +199,14 @@ bool FindPath(int si, int sj, int ti, int tj,
   fScore2[si][sj] = heuristic(si, sj, ti, tj);
   open.push(QItem{ si, sj, fScore2[si][sj] });
 
-  static const int MAX_ASTAR_EXPANSIONS = 1200;  // cap cost so FPS stays high in late match
+  static const int MAX_ASTAR_EXPANSIONS = 800;  // cap for stability (was 1200)
   int expansions = 0;
+  g_astarCallsThisFrame++;
   while (!open.empty()) {
-    if (expansions++ >= MAX_ASTAR_EXPANSIONS) return false;
+    if (expansions++ >= MAX_ASTAR_EXPANSIONS) {
+      g_astarExpansionsThisFrame += expansions;
+      return false;
+    }
     QItem top = open.top();
     open.pop();
     int ci = top.i, cj = top.j;
@@ -211,6 +215,7 @@ bool FindPath(int si, int sj, int ti, int tj,
     closed2[ci][cj] = true;
 
     if (ci == ti && cj == tj) {
+      g_astarExpansionsThisFrame += expansions;
       std::vector<std::pair<int, int>> rev;
       int qi = ti, qj = tj;
       while (qi != -1 && qj != -1) {
@@ -244,5 +249,6 @@ bool FindPath(int si, int sj, int ti, int tj,
       }
     }
   }
+  g_astarExpansionsThisFrame += expansions;
   return false;
 }

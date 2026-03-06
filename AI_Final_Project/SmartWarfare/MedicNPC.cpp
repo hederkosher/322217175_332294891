@@ -4,6 +4,7 @@
 #include "FillMedicine.h"
 #include "GiveMedicine.h"
 #include "Map.h"
+#include "Definitions.h"
 
 MedicNPC::MedicNPC(double positionX, double positionY, char character, int team, int type)
 	: NPC(positionX, positionY, character, team, type)
@@ -25,34 +26,31 @@ void MedicNPC::setIsFillingMedicine(bool isFill) { isFillingMedicine = isFill; }
 bool MedicNPC::getStayedAtMedicine() { return stayedAtMedicine; }
 void MedicNPC::setStayedAtMedicine(bool stayed) { stayedAtMedicine = stayed; }
 
-// Find an injured teammate (any HP < MAX_HP). Prefer most injured; prefer those not in rooms with enemies (avoid fights).
+// Score = (missingHP * w1) - (risk * w2) - (distance * w3) to avoid medic suiciding into hot rooms
 NPC* MedicNPC::FindInjuredTeammate()
 {
 	if (!myTeam) return nullptr;
-	NPC* bestSafe = nullptr;   // most injured in a room with no enemies
-	NPC* bestAny = nullptr;   // most injured in any room
-	double worstHpSafe = MAX_HP;
-	double worstHpAny = MAX_HP;
+	const double wMissing = 1.0, wRisk = 400.0, wDist = 0.5;
+	NPC* best = nullptr;
+	double bestScore = -1e9;
 
 	for (int i = 0; i < TEAM_SIZE; i++) {
 		NPC* t = myTeam[i];
 		if (!t || t == this || t->getHp() <= 0 || t->getHp() >= MAX_HP)
 			continue;
-		double hp = t->getHp();
+		double missingHP = MAX_HP - t->getHp();
 		int room = t->getCurrentRoom();
-		bool roomHasEnemies = RoomHasEnemies(room, enemyTeam);
-
-		if (hp < worstHpAny) {
-			worstHpAny = hp;
-			bestAny = t;
-		}
-		if (!roomHasEnemies && hp < worstHpSafe) {
-			worstHpSafe = hp;
-			bestSafe = t;
+		double risk = RoomHasEnemies(room, enemyTeam) ? 1.0 : 0.0;
+		double tx, ty;
+		t->getPosition(tx, ty);
+		double d = Distance(x, y, tx, ty);
+		double score = missingHP * wMissing - risk * wRisk - d * wDist;
+		if (score > bestScore) {
+			bestScore = score;
+			best = t;
 		}
 	}
-	// Prefer injured in safe rooms; if none, go to most injured even in combat zone
-	return bestSafe ? bestSafe : bestAny;
+	return best;
 }
 
 NPC* MedicNPC::FindClosestWarrior() {
@@ -156,47 +154,69 @@ void MedicNPC::DoSomeWork()
 
 	if (isFillingMedicine)
 	{
-		// Claim depot on first fill frame
-		if (fillingDepotIndex < 0) {
-			double bestDist = 1e9;
-			for (int i = 0; i < numMedicine; i++) {
-				double dx = x - medicineX[i];
-				double dy = y - medicineY[i];
-				double d = dx * dx + dy * dy;
-				if (d < bestDist) { bestDist = d; fillingDepotIndex = i; }
+		// Abort if enemy enters room (don't die at depot)
+		int myRoom = getCurrentRoom();
+		if ((myRoom > 0 && RoomHasEnemies(myRoom, enemyTeam)) || HasVisibleEnemyWithin(12.0)) {
+			if (fillingDepotIndex >= 0 && fillingDepotIndex < MAX_DEPOTS) { medicineOccupiedBy[fillingDepotIndex] = 0; fillingDepotIndex = -1; }
+			setIsFillingMedicine(false);
+			if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+			NPC* closest = FindClosestWarrior();
+			if (closest) {
+				pTarget = closest;
+				setGoToTarget(true);
+				double wx, wy;
+				closest->getPosition(wx, wy);
+				setTarget(wx, wy);
+				pCurrentState = new GoToTarget();
+				pCurrentState->OnEnter(this);
+			} else {
+				pCurrentState = new GoToMedicine();
+				pCurrentState->OnEnter(this);
 			}
-			if (fillingDepotIndex >= 0) {
-				int occ = medicineOccupiedBy[fillingDepotIndex];
-				if (occ != 0 && occ != team) {
-					fillingDepotIndex = -1;
+		}
+		else {
+			// Claim depot on first fill frame
+			if (fillingDepotIndex < 0) {
+				double bestDist = 1e9;
+				for (int i = 0; i < numMedicine; i++) {
+					double dx = x - medicineX[i];
+					double dy = y - medicineY[i];
+					double d = dx * dx + dy * dy;
+					if (d < bestDist) { bestDist = d; fillingDepotIndex = i; }
+				}
+				if (fillingDepotIndex >= 0) {
+					int occ = medicineOccupiedBy[fillingDepotIndex];
+					if (occ != 0 && occ != team) {
+						fillingDepotIndex = -1;
+						isFillingMedicine = false;
+						if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+						pCurrentState = new GoToMedicine();
+						pCurrentState->OnEnter(this);
+					} else {
+						medicineOccupiedBy[fillingDepotIndex] = team;
+					}
+				}
+			}
+
+			if (isFillingMedicine) {
+				bool nearMedicine = false;
+				for (int i = 0; i < numMedicine; i++) {
+					double dx = x - medicineX[i];
+					double dy = y - medicineY[i];
+					if (dx * dx + dy * dy < 25.0) { nearMedicine = true; break; }
+				}
+				if (!nearMedicine) {
+					if (fillingDepotIndex >= 0) { medicineOccupiedBy[fillingDepotIndex] = 0; fillingDepotIndex = -1; }
 					isFillingMedicine = false;
 					if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
 					pCurrentState = new GoToMedicine();
 					pCurrentState->OnEnter(this);
+				} else if (medicine < MEDICINE_MAX) {
+					medicine += 0.1;
 				} else {
-					medicineOccupiedBy[fillingDepotIndex] = team;
+					if (fillingDepotIndex >= 0) { medicineOccupiedBy[fillingDepotIndex] = 0; fillingDepotIndex = -1; }
+					pCurrentState->Transition(this);
 				}
-			}
-		}
-
-		if (isFillingMedicine) {
-			bool nearMedicine = false;
-			for (int i = 0; i < numMedicine; i++) {
-				double dx = x - medicineX[i];
-				double dy = y - medicineY[i];
-				if (dx * dx + dy * dy < 25.0) { nearMedicine = true; break; }
-			}
-			if (!nearMedicine) {
-				if (fillingDepotIndex >= 0) { medicineOccupiedBy[fillingDepotIndex] = 0; fillingDepotIndex = -1; }
-				isFillingMedicine = false;
-				if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
-				pCurrentState = new GoToMedicine();
-				pCurrentState->OnEnter(this);
-			} else if (medicine < MEDICINE_MAX) {
-				medicine += 0.1;
-			} else {
-				if (fillingDepotIndex >= 0) { medicineOccupiedBy[fillingDepotIndex] = 0; fillingDepotIndex = -1; }
-				pCurrentState->Transition(this);
 			}
 		}
 	}
@@ -219,12 +239,32 @@ void MedicNPC::DoSomeWork()
 
 	if (isGivingMedicine)
 	{
-		if (!isMoving && goToTarget && pTarget && pTarget->getHp() < MAX_HP && pTarget->getHp() > 0)
+		// Interrupt if risk spikes (enemy close/LOS)
+		if (HasVisibleEnemyWithin(10.0)) {
+			if (pTarget) pTarget->setIsGettingHp(false);
+			setIsGivingMedicine(false);
+			setGoToTarget(false);
+			pTarget = nullptr;
+			if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+			pCurrentState = new GoToMedicine();
+			pCurrentState->OnEnter(this);
+		}
+		else if (!isMoving && goToTarget && pTarget && pTarget->getHp() > 0)
 		{
-			pTarget->setHp(pTarget->getHp() + 0.5);
-			medicine -= 0.1;
-			if (medicine <= 0)
-				pCurrentState->Transition(this);
+			// Don't over-heal: stop when teammate reaches HP_ok
+			if (pTarget->getHp() >= MAX_HP * HP_OK_RATIO) {
+				pTarget->setIsGettingHp(false);
+				setGoToTarget(false);
+				pTarget = nullptr;
+				if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+				pCurrentState = new GoToMedicine();
+				pCurrentState->OnEnter(this);
+			} else {
+				pTarget->setHp(pTarget->getHp() + 0.5);
+				medicine -= 0.1;
+				if (medicine <= 0)
+					pCurrentState->Transition(this);
+			}
 		}
 		else
 		{

@@ -4,10 +4,12 @@
 #include "Map.h"
 #include "MedicNPC.h"
 #include "NPC.h"
+#include "PathfindingStats.h"
 #include "SecurityMap.h"
 #include "SupplyNPC.h"
 #include "WarriorNPC.h"
 #include "glut.h"
+#include <chrono>
 #include <iostream>
 #include <math.h>
 #include <stdlib.h>
@@ -17,6 +19,16 @@
 #include <time.h>
 
 using namespace std;
+
+// Pathfinding stats (defined here, declared in PathfindingStats.h)
+int g_currentFrame = 0;
+int g_currentPathRequesterTeam = 0;
+int g_currentPathRequesterSlot = 0;
+double g_pathfindingMs = 0.0;
+int g_astarCallsThisFrame = 0;
+int g_astarExpansionsThisFrame = 0;
+int g_lastPathRequesterTeam = -1;
+int g_lastPathRequesterSlot = -1;
 
 int gameWinner = 0; // 0 = playing, 1 = team1, 2 = team2, 3 = draw
 const int MATCH_DURATION_MS = 60 * 1000;
@@ -421,6 +433,24 @@ static void OnTimer(int value) {
     }
   }
 
+  // Instant win: if both warriors (slot 0 and 1) of a team are dead, the other team wins
+  bool team1WarriorsDead = (team1[0] == nullptr && team1[1] == nullptr);
+  bool team2WarriorsDead = (team2[0] == nullptr && team2[1] == nullptr);
+  if (team1WarriorsDead && !team2WarriorsDead) {
+    gameWinner = 2;
+    PrintFinalGameStats();
+    glutPostRedisplay();
+    glutTimerFunc(FRAME_MS, OnTimer, 0);
+    return;
+  }
+  if (team2WarriorsDead && !team1WarriorsDead) {
+    gameWinner = 1;
+    PrintFinalGameStats();
+    glutPostRedisplay();
+    glutTimerFunc(FRAME_MS, OnTimer, 0);
+    return;
+  }
+
   // Timer expiry - decide winner by total HP
   if (GetRemainingMs() <= 0) {
     double hp1 = 0, hp2 = 0;
@@ -476,37 +506,93 @@ static void OnTimer(int value) {
     return;
   }
 
-  g_pathFindBudget = 1;  // 1 path per frame caps cost (~25-30ms max); support runs first for spawn
+  using Clock = std::chrono::high_resolution_clock;
+  auto tickStart = Clock::now();
+  double visibilityMs = 0, securityMs = 0, aiMs = 0, pathfindingMs = 0, bulletsMs = 0, grenadesMs = 0;
+
+  g_pathFindBudget = 2;  // per A* run (so max 2 runs per frame: e.g. one with NPCs + one fallback)
+  g_astarCallsThisFrame = 0;
+  g_astarExpansionsThisFrame = 0;
+  g_pathfindingMs = 0.0;
+  g_lastPathRequesterTeam = -1;
+  g_lastPathRequesterSlot = -1;
+  g_currentFrame++;
 
   // Visibility update for all NPCs
-  for (int i = 0; i < TEAM_SIZE; i++) {
-    if (team1[i])
-      team1[i]->UpdateVisibility(team1, team2);
-    if (team2[i])
-      team2[i]->UpdateVisibility(team2, team1);
+  {
+    auto t0 = Clock::now();
+    for (int i = 0; i < TEAM_SIZE; i++) {
+      if (team1[i])
+        team1[i]->UpdateVisibility(team1, team2);
+      if (team2[i])
+        team2[i]->UpdateVisibility(team2, team1);
+    }
+    visibilityMs = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
   }
 
-  // AI update: run support (medic 2, supply 3) before warriors (0, 1) so they get path budget at spawn
-  for (int i = 2; i < TEAM_SIZE; i++) {
-    if (team1[i]) team1[i]->DoSomeWork();
-    if (team2[i]) team2[i]->DoSomeWork();
+  // Update safety map for combat rooms (risk-weighted pathfinding)
+  {
+    auto t0 = Clock::now();
+    UpdateSecurityMapForCombatRooms(team1, team2);
+    securityMs = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
   }
-  for (int i = 0; i < 2; i++) {
-    if (team1[i]) team1[i]->DoSomeWork();
-    if (team2[i]) team2[i]->DoSomeWork();
+
+  // NPC occupancy grid for O(1) A* footprint checks (avoids O(expansions * NPCs) scan)
+  UpdateNpcOccupancy(team1, team2);
+
+  // AI update: run support (medic 2, supply 3) before warriors (0, 1)
+  {
+    auto t0 = Clock::now();
+    for (int i = 2; i < TEAM_SIZE; i++) {
+      g_currentPathRequesterTeam = 1;
+      g_currentPathRequesterSlot = i;
+      if (team1[i]) team1[i]->DoSomeWork();
+      g_currentPathRequesterTeam = 2;
+      g_currentPathRequesterSlot = i;
+      if (team2[i]) team2[i]->DoSomeWork();
+    }
+    for (int i = 0; i < 2; i++) {
+      g_currentPathRequesterTeam = 1;
+      g_currentPathRequesterSlot = i;
+      if (team1[i]) team1[i]->DoSomeWork();
+      g_currentPathRequesterTeam = 2;
+      g_currentPathRequesterSlot = i;
+      if (team2[i]) team2[i]->DoSomeWork();
+    }
+    aiMs = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
   }
+  pathfindingMs = g_pathfindingMs;
 
   // Bullet movement
-  BulletMovement(NPCType::Warrior_1, team1);
-  BulletMovement(NPCType::Warrior_2, team1);
-  BulletMovement(NPCType::Warrior_1, team2);
-  BulletMovement(NPCType::Warrior_2, team2);
+  {
+    auto t0 = Clock::now();
+    BulletMovement(NPCType::Warrior_1, team1);
+    BulletMovement(NPCType::Warrior_2, team1);
+    BulletMovement(NPCType::Warrior_1, team2);
+    BulletMovement(NPCType::Warrior_2, team2);
+    bulletsMs = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+  }
 
   // Grenade movement
-  GranadeMovement(NPCType::Warrior_1, team1);
-  GranadeMovement(NPCType::Warrior_2, team1);
-  GranadeMovement(NPCType::Warrior_1, team2);
-  GranadeMovement(NPCType::Warrior_2, team2);
+  {
+    auto t0 = Clock::now();
+    GranadeMovement(NPCType::Warrior_1, team1);
+    GranadeMovement(NPCType::Warrior_2, team1);
+    GranadeMovement(NPCType::Warrior_1, team2);
+    GranadeMovement(NPCType::Warrior_2, team2);
+    grenadesMs = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+  }
+
+  double tickMs = std::chrono::duration<double, std::milli>(Clock::now() - tickStart).count();
+  if (tickMs > SLOW_FRAME_THRESHOLD_MS) {
+    static const char* slotNames[] = { "W1", "W2", "M", "P" };
+    const char* req = (g_lastPathRequesterTeam >= 1 && g_lastPathRequesterTeam <= 2 && g_lastPathRequesterSlot >= 0 && g_lastPathRequesterSlot < 4)
+      ? slotNames[g_lastPathRequesterSlot] : "?";
+    printf("[SLOW] tick=%.1fms vis=%.2f sec=%.2f ai=%.1f path=%.1f astar_calls=%d expansions=%d last_path=T%d%s\n",
+           tickMs, visibilityMs, securityMs, aiMs, pathfindingMs,
+           g_astarCallsThisFrame, g_astarExpansionsThisFrame,
+           g_lastPathRequesterTeam, req);
+  }
 
   glutPostRedisplay();
   glutTimerFunc(FRAME_MS, OnTimer, 0);

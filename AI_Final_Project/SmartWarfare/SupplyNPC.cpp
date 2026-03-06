@@ -4,6 +4,7 @@
 #include "GoToWarrior.h"
 #include "GoToArmory.h"
 #include "Map.h"
+#include "Definitions.h"
 
 SupplyNPC::SupplyNPC(double positionX, double positionY, char character,
                      int team, int type)
@@ -25,25 +26,26 @@ void SupplyNPC::setAmmo(double value) { ammo = value; }
 bool SupplyNPC::getStayedAtArmory() { return stayedAtArmory; }
 void SupplyNPC::setStayedAtArmory(bool stayed) { stayedAtArmory = stayed; }
 
+// Score = (1 - ammoRatio)*priority - distancePenalty - riskPenalty; prefer fighting warriors only if route risk acceptable
 WarriorNPC *SupplyNPC::FindWarriorNeedingAmmo() {
-  if (!myTeam)
-    return nullptr;
-  WarriorNPC *worst = nullptr;
-  double worstAmmo = AMMO_MAX;
+  if (!myTeam) return nullptr;
+  const double wAmmo = 100.0, wDist = 0.3, wRisk = 80.0;
+  WarriorNPC *best = nullptr;
+  double bestScore = -1e9;
 
-  // Warriors are at indices 0 and 1
   for (int i = 0; i < 2; i++) {
-    if (auto w = dynamic_cast<WarriorNPC *>(myTeam[i])) {
-      // Treat a warrior as needing ammo when they are noticeably below full.
-      if (w->getHp() > 0 && w->getAmmo() < AMMO_MAX * 0.95) {
-        if (w->getAmmo() < worstAmmo) {
-          worstAmmo = w->getAmmo();
-          worst = w;
-        }
-      }
-    }
+    auto *w = dynamic_cast<WarriorNPC *>(myTeam[i]);
+    if (!w || w->getHp() <= 0 || w->getAmmo() >= AMMO_MAX * 0.95) continue;
+    double ammoRatio = w->getAmmo() / AMMO_MAX;
+    double wx, wy;
+    w->getPosition(wx, wy);
+    double d = Distance(x, y, wx, wy);
+    int room = w->getCurrentRoom();
+    double risk = RoomHasEnemies(room, enemyTeam) ? 1.0 : 0.0;
+    double score = (1.0 - ammoRatio) * wAmmo - d * wDist - risk * wRisk;
+    if (score > bestScore) { bestScore = score; best = w; }
   }
-  return worst;
+  return best;
 }
 
 WarriorNPC *SupplyNPC::FindWarriorWithLowestAmmo() {
@@ -241,23 +243,44 @@ void SupplyNPC::DoSomeWork() {
     }
 
     if (isFillingAmmo) {
-      bool nearArmory = false;
-      for (int i = 0; i < numArmories; i++) {
-        double dx = x - armoryX[i];
-        double dy = y - armoryY[i];
-        if (dx * dx + dy * dy < 25.0) { nearArmory = true; break; }
-      }
-      if (!nearArmory) {
-        if (fillingDepotIndex >= 0) { armoryOccupiedBy[fillingDepotIndex] = 0; fillingDepotIndex = -1; }
-        isFillingAmmo = false;
+      // Abort if enemy enters room (don't die at depot)
+      int myRoom = getCurrentRoom();
+      if ((myRoom > 0 && RoomHasEnemies(myRoom, enemyTeam)) || HasVisibleEnemyWithin(12.0)) {
+        if (fillingDepotIndex >= 0 && fillingDepotIndex < MAX_DEPOTS) { armoryOccupiedBy[fillingDepotIndex] = 0; fillingDepotIndex = -1; }
+        setIsFillingAmmo(false);
         if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
-        pCurrentState = new GoToArmory();
-        pCurrentState->OnEnter(this);
-      } else if (ammo < AMMO_MAX) {
-        ammo += 0.1;
+        WarriorNPC *closest = FindClosestWarrior();
+        if (closest) {
+          pWarrior = closest;
+          setGoToWarrior(true);
+          double wx, wy;
+          closest->getPosition(wx, wy);
+          setTarget(wx, wy);
+          pCurrentState = new GoToWarrior();
+          pCurrentState->OnEnter(this);
+        } else {
+          pCurrentState = new GoToArmory();
+          pCurrentState->OnEnter(this);
+        }
       } else {
-        if (fillingDepotIndex >= 0) { armoryOccupiedBy[fillingDepotIndex] = 0; fillingDepotIndex = -1; }
-        pCurrentState->Transition(this);
+        bool nearArmory = false;
+        for (int i = 0; i < numArmories; i++) {
+          double dx = x - armoryX[i];
+          double dy = y - armoryY[i];
+          if (dx * dx + dy * dy < 25.0) { nearArmory = true; break; }
+        }
+        if (!nearArmory) {
+          if (fillingDepotIndex >= 0) { armoryOccupiedBy[fillingDepotIndex] = 0; fillingDepotIndex = -1; }
+          isFillingAmmo = false;
+          if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+          pCurrentState = new GoToArmory();
+          pCurrentState->OnEnter(this);
+        } else if (ammo < AMMO_MAX) {
+          ammo += 0.1;
+        } else {
+          if (fillingDepotIndex >= 0) { armoryOccupiedBy[fillingDepotIndex] = 0; fillingDepotIndex = -1; }
+          pCurrentState->Transition(this);
+        }
       }
     }
   }
@@ -271,7 +294,16 @@ void SupplyNPC::DoSomeWork() {
   }
 
   if (isGivingAmmo) {
-    if (!isMoving && pWarrior && pWarrior->getAmmo() < AMMO_MAX) {
+    // Interrupt by risk spike; retreat then retry or abandon
+    if (HasVisibleEnemyWithin(10.0)) {
+      setIsGivingAmmo(false);
+      setGoToWarrior(false);
+      pWarrior = nullptr;
+      supplyMessageShown = false;
+      if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+      pCurrentState = new GoToArmory();
+      pCurrentState->OnEnter(this);
+    } else if (!isMoving && pWarrior && pWarrior->getAmmo() < AMMO_MAX) {
       pWarrior->setAmmo(pWarrior->getAmmo() + 0.1);
       ammo -= 0.1;
       if (ammo <= 0) {

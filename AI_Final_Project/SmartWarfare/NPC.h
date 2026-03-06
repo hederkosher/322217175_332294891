@@ -19,6 +19,7 @@ protected:
   State *pCurrentState = nullptr;
   std::vector<std::pair<int, int>> path;
   int pathIndex = -1;
+  int lastPlanFrame = -1000;  // replan cooldown: only PlanPathTo* every REPLAN_COOLDOWN_FRAMES
 
   int npcType;
   int visibilityMap[MSZ][MSZ];
