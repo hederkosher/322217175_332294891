@@ -196,7 +196,7 @@ void WarriorNPC::EvaluatePriorities() {
     return;
   }
 
-  // If attacking but enemy left room, stop attacking
+  // If attacking but enemy left room, stop attacking and search for new enemies
   if (dynamic_cast<AttackState *>(pCurrentState) && !enemy) {
     if (pCurrentState) {
       pCurrentState->OnExit(this);
@@ -205,6 +205,7 @@ void WarriorNPC::EvaluatePriorities() {
     pCurrentState = new MoveToTargetState();
     pCurrentState->OnEnter(this);
     printedAttackMsg = false;
+    SearchForEnemies();
   }
 }
 
