@@ -95,10 +95,14 @@ void SupplyNPC::DoSomeWork() {
       }
     }
 
-    // Follow path while fleeing
+    // Follow path while fleeing — only "arrive" when in a room (never stop in corridor)
     if (isMoving && FollowPlannedPath(1)) {
-      if (pCurrentState)
-        pCurrentState->Transition(this);
+      if (!IsInCorridor()) {
+        if (pCurrentState)
+          pCurrentState->Transition(this);
+      } else {
+        MoveToNearestRoom();
+      }
     }
     return;
   }
@@ -146,9 +150,14 @@ void SupplyNPC::DoSomeWork() {
       counter++;
     }
 
+    // Only treat path as complete when in a room — never stop in corridor so enemies can engage
     if (FollowPlannedPath(1)) {
-      if (pCurrentState)
-        pCurrentState->Transition(this);
+      if (!IsInCorridor()) {
+        if (pCurrentState)
+          pCurrentState->Transition(this);
+      } else {
+        MoveToNearestRoom();
+      }
     }
   }
 
