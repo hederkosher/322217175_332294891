@@ -15,7 +15,10 @@ void MoveToTargetState::Transition(NPC* pn)
 {
 	if (auto warrior = dynamic_cast<WarriorNPC*>(pn))
 	{
-		// Room-based: only attack if enemy is in the same room AND there is line-of-sight
+		// Don't interrupt fleeing warriors -- let them reach medic/supply
+		if (warrior->isInRisk())
+			return;
+
 		NPC* enemy = warrior->FindEnemyInSameRoom();
 		if (warrior->getAmmo() > 0 && enemy)
 		{

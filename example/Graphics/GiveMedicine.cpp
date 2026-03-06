@@ -24,5 +24,6 @@ void GiveMedicine::OnExit(NPC *pn) {
     mn->setGoToTarget(false);
     if (mn->getTargetNPC())
       mn->getTargetNPC()->setIsGettingHp(false);
+    mn->setTargetNPC(nullptr);
   }
 }

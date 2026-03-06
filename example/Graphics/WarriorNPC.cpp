@@ -141,7 +141,8 @@ void WarriorNPC::EvaluatePriorities() {
   } else {
     printedHpFleeMsg = false;
     // Recovery: HP is back above threshold, resume combat
-    if (dynamic_cast<GoToDefenseState *>(pCurrentState)) {
+    if (dynamic_cast<GoToDefenseState *>(pCurrentState) ||
+        dynamic_cast<IdleState *>(pCurrentState)) {
       if (pCurrentState) {
         pCurrentState->OnExit(this);
         delete pCurrentState;

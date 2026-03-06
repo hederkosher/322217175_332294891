@@ -8,7 +8,7 @@ void GoToTarget::OnEnter(NPC *pn) {
   double x, y;
   if (auto mn = dynamic_cast<MedicNPC *>(pn)) {
     pn->setIsMoving(true);
-    if (mn->getTargetNPC() && mn->getTargetNPC()->getHp() < MAX_HP / 2 &&
+    if (mn->getTargetNPC() && mn->getTargetNPC()->getHp() < MAX_HP * 0.7 &&
         mn->getTargetNPC()->getHp() > 0) {
       mn->setGoToTarget(true);
       mn->getTargetNPC()->getPosition(x, y);
