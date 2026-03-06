@@ -38,6 +38,6 @@ const int SUPPLY_1 = 16;
 const int SUPPLY_2 = 17;
 
 // Maze / Room constants
-const int GRID_ROWS = 3;
-const int GRID_COLS = 3;
+const int GRID_ROWS = 2;
+const int GRID_COLS = 2;
 const int MAX_ROOMS = GRID_ROWS * GRID_COLS;

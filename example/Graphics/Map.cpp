@@ -40,12 +40,12 @@ Room *GetRoomById(int id) {
   return nullptr;
 }
 
-// Carve a horizontal corridor segment (3 cells wide)
+// Carve a horizontal corridor segment (5 cells wide)
 static void CarveHorizontalCorridor(int x1, int x2, int y) {
   int minX = std::min(x1, x2);
   int maxX = std::max(x1, x2);
   for (int i = minX; i <= maxX; i++) {
-    for (int w = -1; w <= 1; w++) {
+    for (int w = -2; w <= 2; w++) {
       int j = y + w;
       if (i >= 0 && i < MSZ && j >= 0 && j < MSZ) {
         if (map[i][j] == WALL) {
@@ -56,12 +56,12 @@ static void CarveHorizontalCorridor(int x1, int x2, int y) {
   }
 }
 
-// Carve a vertical corridor segment (3 cells wide)
+// Carve a vertical corridor segment (5 cells wide)
 static void CarveVerticalCorridor(int x, int y1, int y2) {
   int minY = std::min(y1, y2);
   int maxY = std::max(y1, y2);
   for (int j = minY; j <= maxY; j++) {
-    for (int w = -1; w <= 1; w++) {
+    for (int w = -2; w <= 2; w++) {
       int i = x + w;
       if (i >= 0 && i < MSZ && j >= 0 && j < MSZ) {
         if (map[i][j] == WALL) {
@@ -90,7 +90,7 @@ static void PlaceObstaclesInRoom(const Room &room) {
   if (roomW < 10 || roomH < 10)
     return;
 
-  int numObstacles = 2 + rand() % 3; // 2-4 per room
+  int numObstacles = 1 + rand() % 2; // 1-2 per room
   for (int o = 0; o < numObstacles; o++) {
     int ox = room.x1 + 3 + rand() % (roomW - 7);
     int oy = room.y1 + 3 + rand() % (roomH - 7);
@@ -192,17 +192,11 @@ static bool FindSpawnInRoom(const Room &room, double &outX, double &outY) {
 
 // Place troops in rooms
 static void PlaceTroops(NPC **team1, NPC **team2) {
-  // Team 1 spawns in a right-side room (column 2)
-  int rightRooms[] = {2, 5, 8};
-  int r1 = rightRooms[rand() % 3];
-  if (r1 >= numRooms)
-    r1 = numRooms - 1;
-
-  // Team 2 spawns in a left-side room (column 0)
-  int leftRooms[] = {0, 3, 6};
-  int r2 = leftRooms[rand() % 3];
-  if (r2 >= numRooms)
-    r2 = 0;
+  // Team 1 spawns in top-right room, Team 2 in bottom-left (opposite corners)
+  int r1 = 1;  // top-right in 2x2 grid (row 0, col 1)
+  int r2 = 2;  // bottom-left in 2x2 grid (row 1, col 0)
+  if (r1 >= numRooms) r1 = numRooms - 1;
+  if (r2 >= numRooms) r2 = 0;
 
   double sx, sy;
 
@@ -254,8 +248,8 @@ static void GenerateMaze() {
       int sectorX = col * sectorW;
       int sectorY = row * sectorH;
 
-      int roomW = 14 + rand() % 8; // 14-21 cells
-      int roomH = 14 + rand() % 8;
+      int roomW = 25 + rand() % 10; // 25-34 cells
+      int roomH = 25 + rand() % 10;
 
       if (roomW > sectorW - 4)
         roomW = sectorW - 4;
