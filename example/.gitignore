@@ -1,2 +1,7 @@
 .vs
 *.mp4
+
+# Build outputs
+*.obj
+Graphics/Debug/Graphics.exe
+Graphics/Debug/Graphics.pdb
