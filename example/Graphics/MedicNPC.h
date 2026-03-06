@@ -14,6 +14,7 @@ private:
     bool goToTarget = false;
 
     int scanCooldown = 0;
+    int followCooldown = 0;
 
 public:
     MedicNPC(double positionX, double positionY, char character, int team, int type);

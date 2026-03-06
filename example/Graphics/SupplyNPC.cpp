@@ -33,7 +33,7 @@ WarriorNPC *SupplyNPC::FindWarriorNeedingAmmo() {
   // Warriors are at indices 0 and 1
   for (int i = 0; i < 2; i++) {
     if (auto w = dynamic_cast<WarriorNPC *>(myTeam[i])) {
-      if (w->getHp() > 0 && w->getAmmo() < AMMO_MAX / 3.0) {
+      if (w->getHp() > 0 && w->getAmmo() < AMMO_MAX * 0.5) {
         if (w->getAmmo() < worstAmmo) {
           worstAmmo = w->getAmmo();
           worst = w;
@@ -64,7 +64,7 @@ void SupplyNPC::DoSomeWork() {
       pCurrentState = new GoToWarrior();
       pCurrentState->OnEnter(this);
     }
-    scanCooldown = 120;
+    scanCooldown = 30;
   }
 
   if (isMoving && !isGettingHp) {
@@ -106,6 +106,37 @@ void SupplyNPC::DoSomeWork() {
         pCurrentState->Transition(this);
     } else {
       pCurrentState->Transition(this);
+    }
+  }
+
+  // Follow nearest warrior when idle (not moving, not filling, not giving, has ammo)
+  if (!isMoving && !isFillingAmmo && !isGivingAmmo && !goToWarrior
+      && ammo >= AMMO_MAX * 0.3 && myTeam)
+  {
+    followCooldown--;
+    if (followCooldown <= 0)
+    {
+      NPC* nearest = nullptr;
+      double bestDist = 99999.0;
+      for (int i = 0; i < 2; i++) {
+        if (myTeam[i] && myTeam[i]->getHp() > 0) {
+          double wx, wy;
+          myTeam[i]->getPosition(wx, wy);
+          double d = Distance(x, y, wx, wy);
+          if (d < bestDist) {
+            bestDist = d;
+            nearest = myTeam[i];
+          }
+        }
+      }
+      if (nearest && bestDist > 8.0) {
+        double wx, wy;
+        nearest->getPosition(wx, wy);
+        setTarget(wx, wy);
+        PlanPathTo();
+        isMoving = true;
+      }
+      followCooldown = 60;
     }
   }
 }

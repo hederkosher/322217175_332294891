@@ -32,7 +32,7 @@ NPC* MedicNPC::FindInjuredTeammate()
 
 	for (int i = 0; i < TEAM_SIZE; i++) {
 		if (myTeam[i] && myTeam[i] != this && myTeam[i]->getHp() > 0
-			&& myTeam[i]->getHp() < MAX_HP * 0.5)
+			&& myTeam[i]->getHp() < MAX_HP * 0.7)
 		{
 			if (myTeam[i]->getHp() < worstHp) {
 				worstHp = myTeam[i]->getHp();
@@ -60,7 +60,7 @@ void MedicNPC::DoSomeWork()
 			pCurrentState = new GoToTarget();
 			pCurrentState->OnEnter(this);
 		}
-		scanCooldown = 120;
+		scanCooldown = 30;
 	}
 
 	if (isMoving)
@@ -115,6 +115,37 @@ void MedicNPC::DoSomeWork()
 		else
 		{
 			pCurrentState->Transition(this);
+		}
+	}
+
+	// Follow nearest warrior when idle (not moving, not filling, not giving, has medicine)
+	if (!isMoving && !isFillingMedicine && !isGivingMedicine && !goToTarget
+		&& medicine >= MEDICINE_MAX * 0.3 && myTeam)
+	{
+		followCooldown--;
+		if (followCooldown <= 0)
+		{
+			NPC* nearest = nullptr;
+			double bestDist = 99999.0;
+			for (int i = 0; i < 2; i++) {
+				if (myTeam[i] && myTeam[i]->getHp() > 0) {
+					double wx, wy;
+					myTeam[i]->getPosition(wx, wy);
+					double d = Distance(x, y, wx, wy);
+					if (d < bestDist) {
+						bestDist = d;
+						nearest = myTeam[i];
+					}
+				}
+			}
+			if (nearest && bestDist > 8.0) {
+				double wx, wy;
+				nearest->getPosition(wx, wy);
+				setTarget(wx, wy);
+				PlanPathTo();
+				isMoving = true;
+			}
+			followCooldown = 60;
 		}
 	}
 }

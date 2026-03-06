@@ -14,6 +14,7 @@ private:
   bool stayedAtArmory = false;
 
   int scanCooldown = 0;
+  int followCooldown = 0;
 
 public:
   SupplyNPC(double positionX, double positionY, char character, int team,

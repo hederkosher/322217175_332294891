@@ -117,6 +117,7 @@ void WarriorNPC::EvaluatePriorities() {
         myTeam[2]->getPosition(mx, my);
         setTarget(mx, my);
         PlanPathTo();
+        fleeRepathCounter = 0;
         pCurrentState = new MoveToTargetState();
         pCurrentState->OnEnter(this);
       } else {
@@ -125,13 +126,34 @@ void WarriorNPC::EvaluatePriorities() {
       }
       return;
     }
+    // Periodically replan path to medic (medic moves)
+    if (dynamic_cast<MoveToTargetState *>(pCurrentState) &&
+        myTeam && myTeam[2] && myTeam[2]->getHp() > 0) {
+      fleeRepathCounter++;
+      if (fleeRepathCounter >= 50) {
+        double mx, my;
+        myTeam[2]->getPosition(mx, my);
+        setTarget(mx, my);
+        PlanPathTo();
+        fleeRepathCounter = 0;
+      }
+    }
   } else {
-    // Condition cleared, allow message again on next critical event
     printedHpFleeMsg = false;
+    // Recovery: HP is back above threshold, resume combat
+    if (dynamic_cast<GoToDefenseState *>(pCurrentState)) {
+      if (pCurrentState) {
+        pCurrentState->OnExit(this);
+        delete pCurrentState;
+      }
+      pCurrentState = new MoveToTargetState();
+      pCurrentState->OnEnter(this);
+      SearchForEnemies();
+    }
   }
 
-  // Priority 2: low ammo ? seek supply
-  if (ammoRatio < ammoFleeThreshold && isAttacking) {
+  // Priority 2: low ammo ? seek supply (triggers regardless of attacking state)
+  if (ammoRatio < ammoFleeThreshold) {
     if (!printedLowAmmoMsg) {
       std::string color = (team == 1 ? TEAM1 : TEAM2);
       std::cout << color << "Warrior #" << npcType << " team " << team
@@ -151,16 +173,16 @@ void WarriorNPC::EvaluatePriorities() {
       myTeam[3]->getPosition(lx, ly);
       setTarget(lx, ly);
       PlanPathTo();
+      fleeRepathCounter = 0;
       pCurrentState = new MoveToTargetState();
       pCurrentState->OnEnter(this);
     } else {
-      pCurrentState = new IdleState();
+      pCurrentState = new GoToDefenseState();
       pCurrentState->OnEnter(this);
     }
     return;
   }
-  else if (ammoRatio >= ammoFleeThreshold) {
-    // Reset when ammo is back to a safe level
+  else {
     printedLowAmmoMsg = false;
   }
 

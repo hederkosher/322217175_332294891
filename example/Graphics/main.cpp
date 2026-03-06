@@ -33,7 +33,7 @@ void drawText(double x, double y, const char *text, void *font) {
 }
 
 void init() {
-  srand(1796);
+  srand((unsigned)time(NULL));
   // Use float literals to match GLclampf and avoid truncation warnings
   glClearColor(0.0f, 0.5f, 0.8f, 0.0f);
   glOrtho(0, 100, 0, 100, -1, 1);
