@@ -208,10 +208,12 @@ bool NPC::HasLineOfSight(double tX, double tY) const
 
 	if (distance < 1.0) return true;
 
-	double stepX = (dx / distance) * 1.2;
-	double stepY = (dy / distance) * 1.5;
+	double stepSize = 0.5;
+	double stepX = (dx / distance) * stepSize;
+	double stepY = (dy / distance) * stepSize;
+	int numSteps = static_cast<int>(distance / stepSize);
 
-	for (int i = 0; i < static_cast<int>(distance); ++i)
+	for (int i = 0; i < numSteps; ++i)
 	{
 		currentX += stepX;
 		currentY += stepY;
