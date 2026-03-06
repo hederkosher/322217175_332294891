@@ -2,6 +2,7 @@
 #include "AttackState.h"
 #include "Bullet.h"
 #include "GoToDefenseState.h"
+#include "IdleState.h"
 #include "Map.h"
 #include "MoveToTargetState.h"
 #include <algorithm>
@@ -189,8 +190,8 @@ void WarriorNPC::SearchForEnemies() {
 
   Room *room = GetRoomById(targetRoom);
   if (room) {
-    int tx = room->x1 + 3 + rand() % max(1, room->x2 - room->x1 - 6);
-    int ty = room->y1 + 3 + rand() % max(1, room->y2 - room->y1 - 6);
+    int tx = room->x1 + 3 + rand() % std::max(1, room->x2 - room->x1 - 6);
+    int ty = room->y1 + 3 + rand() % std::max(1, room->y2 - room->y1 - 6);
     setTarget(tx, ty);
     PlanPathTo();
 
