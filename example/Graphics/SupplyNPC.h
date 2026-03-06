@@ -9,9 +9,9 @@ private:
   double ammo;
   bool isFillingAmmo = false;
   bool isGivingAmmo = false;
-  bool goToNeedyWarrior = false;
+  bool goToWarrior = false;
   WarriorNPC *pWarrior = nullptr;
-  bool waitingAtArmory = false;
+  bool stayedAtArmory = false;
 
   int scanCooldown = 0;
 
@@ -20,15 +20,15 @@ public:
             int type);
   void setWarriorPointer(WarriorNPC *pW);
   WarriorNPC *getWarriorPointer();
-  bool getGoToNeedyWarrior();
-  void setGoToNeedyWarrior(bool goToW);
+  bool getGoToWarrior();
+  void setGoToWarrior(bool goToW);
   bool getIsGivingAmmo();
   void setIsGivingAmmo(bool isGive);
   bool getIsFillingAmmo();
   void setIsFillingAmmo(bool isFill);
   void setAmmo(double value);
-  bool getWaitingAtArmory();
-  void setWaitingAtArmory(bool stayed);
+  bool getStayedAtArmory();
+  void setStayedAtArmory(bool stayed);
   void DoSomeWork();
   void show() override;
 

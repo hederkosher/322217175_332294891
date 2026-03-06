@@ -3,7 +3,7 @@
 
 class NPC;
 
-class GoToNeedyWarriorState : public State
+class GoToWarrior : public State
 {
 public:
 	void OnEnter(NPC* pn);

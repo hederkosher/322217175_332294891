@@ -10,7 +10,7 @@ void FillAmmo::OnEnter(NPC *pn) {
 
 void FillAmmo::Transition(NPC *pn) {
   OnExit(pn);
-  pn->setCurrentState(new GoToNeedyWarriorState());
+  pn->setCurrentState(new GoToWarrior());
   pn->getCurrentState()->OnEnter(pn);
 }
 

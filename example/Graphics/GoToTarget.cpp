@@ -1,27 +1,27 @@
-#include "GoToInjuredState.h"
+#include "GoToTarget.h"
 #include "GiveMedicine.h"
 #include "MedicNPC.h"
 #include "NPC.h"
 
 
-void GoToInjuredState::OnEnter(NPC *pn) {
+void GoToTarget::OnEnter(NPC *pn) {
   double x, y;
   if (auto mn = dynamic_cast<MedicNPC *>(pn)) {
     pn->setIsMoving(true);
     if (mn->getTargetNPC() && mn->getTargetNPC()->getHp() < MAX_HP / 2 &&
         mn->getTargetNPC()->getHp() > 0) {
-      mn->setGoToInjured(true);
+      mn->setGoToTarget(true);
       mn->getTargetNPC()->getPosition(x, y);
       pn->setTarget(x, y);
-      mn->setWaitingAtMedicine(false);
+      mn->setStayedAtMedicine(false);
       mn->PlanPathTo();
       return;
     }
-    mn->setWaitingAtMedicine(true);
+    mn->setStayedAtMedicine(true);
   }
 }
 
-void GoToInjuredState::Transition(NPC *pn) {
+void GoToTarget::Transition(NPC *pn) {
   OnExit(pn);
   if (auto mn = dynamic_cast<MedicNPC *>(pn)) {
     pn->setCurrentState(new GiveMedicine());
@@ -30,4 +30,4 @@ void GoToInjuredState::Transition(NPC *pn) {
   }
 }
 
-void GoToInjuredState::OnExit(NPC *pn) { pn->setIsMoving(false); }
+void GoToTarget::OnExit(NPC *pn) { pn->setIsMoving(false); }

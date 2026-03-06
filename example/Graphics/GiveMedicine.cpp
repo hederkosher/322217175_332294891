@@ -8,7 +8,7 @@ void GiveMedicine::OnEnter(NPC *pn) {
   if (auto mn = dynamic_cast<MedicNPC *>(pn)) {
     mn->setIsGivingMedicine(true);
     if (mn->getTargetNPC())
-      mn->getTargetNPC()->setIsBeingHealed(true);
+      mn->getTargetNPC()->setIsGettingHp(true);
   }
 }
 
@@ -21,8 +21,8 @@ void GiveMedicine::Transition(NPC *pn) {
 void GiveMedicine::OnExit(NPC *pn) {
   if (auto mn = dynamic_cast<MedicNPC *>(pn)) {
     mn->setIsGivingMedicine(false);
-    mn->setGoToInjured(false);
+    mn->setGoToTarget(false);
     if (mn->getTargetNPC())
-      mn->getTargetNPC()->setIsBeingHealed(false);
+      mn->getTargetNPC()->setIsGettingHp(false);
   }
 }

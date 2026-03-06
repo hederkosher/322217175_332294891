@@ -14,7 +14,7 @@ protected:
   double targetX, targetY;
   double directionX, directionY;
   bool isMoving;
-  bool isBeingHealed = false;
+  bool isGettingHp = false;
   double hp;
   State *pCurrentState = nullptr;
   std::vector<std::pair<int, int>> path;
@@ -49,8 +49,8 @@ public:
   void setHp(double value);
   int getNpcType();
 
-  bool getIsBeingHealed();
-  void setIsBeingHealed(bool value);
+  bool getIsGettingHp();
+  void setIsGettingHp(bool value);
 
   int (*getVisibilityMap())[MSZ];
 

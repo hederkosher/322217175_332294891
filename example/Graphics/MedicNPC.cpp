@@ -1,5 +1,5 @@
 #include "MedicNPC.h"
-#include "GoToInjuredState.h"
+#include "GoToTarget.h"
 #include <iostream>
 
 static int medic_counter = 0;
@@ -14,15 +14,15 @@ MedicNPC::MedicNPC(double positionX, double positionY, char character, int team,
 
 NPC* MedicNPC::getTargetNPC() { return pTarget; }
 void MedicNPC::setTargetNPC(NPC* pT) { pTarget = pT; }
-bool MedicNPC::getGoToInjured() { return goToInjured; }
-void MedicNPC::setGoToInjured(bool gt) { this->goToInjured = gt; }
+bool MedicNPC::getGoToTarget() { return goToTarget; }
+void MedicNPC::setGoToTarget(bool gt) { this->goToTarget = gt; }
 
 bool MedicNPC::getIsGivingMedicine() { return isGivingMedicine; }
 void MedicNPC::setIsGivingMedicine(bool isGive) { isGivingMedicine = isGive; }
 bool MedicNPC::getIsFillingMedicine() { return isFillingMedicine; }
 void MedicNPC::setIsFillingMedicine(bool isFill) { isFillingMedicine = isFill; }
-bool MedicNPC::getWaitingAtMedicine() { return waitingAtMedicine; }
-void MedicNPC::setWaitingAtMedicine(bool stayed) { waitingAtMedicine = stayed; }
+bool MedicNPC::getStayedAtMedicine() { return stayedAtMedicine; }
+void MedicNPC::setStayedAtMedicine(bool stayed) { stayedAtMedicine = stayed; }
 
 NPC* MedicNPC::FindInjuredTeammate()
 {
@@ -57,7 +57,7 @@ void MedicNPC::DoSomeWork()
 				<< ": detected injured teammate, going to heal!" << RESET << std::endl;
 
 			if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
-			pCurrentState = new GoToInjuredState();
+			pCurrentState = new GoToTarget();
 			pCurrentState->OnEnter(this);
 		}
 		scanCooldown = 120;
@@ -66,7 +66,7 @@ void MedicNPC::DoSomeWork()
 	if (isMoving)
 	{
 		double pos_x, pos_y;
-		if (goToInjured && pTarget)
+		if (goToTarget && pTarget)
 		{
 			pTarget->getPosition(pos_x, pos_y);
 			setTarget(pos_x, pos_y);
@@ -93,19 +93,19 @@ void MedicNPC::DoSomeWork()
 		}
 	}
 
-	if (waitingAtMedicine)
+	if (stayedAtMedicine)
 	{
 		if (pTarget && pTarget->getHp() < MAX_HP && pTarget->getHp() > 0)
 		{
 			if (medicine >= MEDICINE_MAX)
-				if (auto goToInjuredState = dynamic_cast<GoToInjuredState*>(pCurrentState))
-					goToInjuredState->OnEnter(this);
+				if (auto GoToTargetState = dynamic_cast<GoToTarget*>(pCurrentState))
+					GoToTargetState->OnEnter(this);
 		}
 	}
 
 	if (isGivingMedicine)
 	{
-		if (goToInjured && pTarget && pTarget->getHp() < MAX_HP && pTarget->getHp() > 0)
+		if (goToTarget && pTarget && pTarget->getHp() < MAX_HP && pTarget->getHp() > 0)
 		{
 			pTarget->setHp(pTarget->getHp() + 0.5);
 			medicine -= 0.1;
