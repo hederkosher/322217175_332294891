@@ -1,5 +1,7 @@
 # Smart WarFare
 
+**Students:** Ronen Shershnev (322217175), Vladislav Palvyuk (332294891)
+
 Short 2D tactical game: two teams (orange vs blue) of 4 units each (2 Warriors, 1 Medic, 1 Supply) fight on a grid map. Warriors attack and defend; Medics heal teammates; Supply units bring ammo and medicine from depots. **Win** by killing all enemy warriors, or by having more total HP when the 1‑minute match ends.
 
 ---
