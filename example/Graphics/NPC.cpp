@@ -62,18 +62,10 @@ void NPC::show()
 {
 	const double size = 3.0;
 
-	// Role-based body colour; supply keeps a team tint for identification
+	// Role-based body colour: medic and supply use team colour (red/blue) like warriors
 	double cr, cg, cb;
-	if (symbol == 'M') {
-		cr = 0.0;  cg = 0.9;  cb = 0.4;   // medic: bright green
-	} else if (symbol == 'P') {
-		if (team == 1) { cr = 0.9; cg = 0.55; cb = 0.0; }  // supply t1: warm orange
-		else           { cr = 0.0; cg = 0.6;  cb = 0.9; }  // supply t2: muted cyan
-	} else {
-		// warrior: vivid team colour
-		if (team == 1) { cr = 1.0; cg = 0.2;  cb = 0.0; }
-		else           { cr = 0.0; cg = 0.75; cb = 1.0; }
-	}
+	if (team == 1) { cr = 1.0; cg = 0.2;  cb = 0.0; }   // team 1: red/orange
+	else           { cr = 0.0; cg = 0.75; cb = 1.0; }   // team 2: blue/cyan
 
 	// Soft glow (slightly larger, 30 % brightness quad behind body)
 	glColor3d(cr * 0.3, cg * 0.3, cb * 0.3);

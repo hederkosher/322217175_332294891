@@ -24,6 +24,7 @@ void SupplyNPC::setIsGivingAmmo(bool isGive) { isGivingAmmo = isGive; }
 bool SupplyNPC::getIsFillingAmmo() { return isFillingAmmo; }
 void SupplyNPC::setIsFillingAmmo(bool isFill) { isFillingAmmo = isFill; }
 void SupplyNPC::setAmmo(double value) { ammo = value; }
+double SupplyNPC::getAmmo() const { return ammo; }
 bool SupplyNPC::getStayedAtArmory() { return stayedAtArmory; }
 void SupplyNPC::setStayedAtArmory(bool stayed) { stayedAtArmory = stayed; }
 

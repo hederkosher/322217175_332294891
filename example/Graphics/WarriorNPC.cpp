@@ -366,10 +366,9 @@ void WarriorNPC::DoSomeWork() {
 
       // Every 180 frames throw a grenade instead of a bullet (only once per warrior)
       if (!hasThrownGrenade && grenadeCounter >= 180 && pGrenade == nullptr && ammo >= 5) {
-        pGrenade = new Grenade(targetCx, targetCy, team);
+        pGrenade = new Grenade(x + 1.5, y + 1.5, targetCx, targetCy, team);
         std::cout << GRENADE << "Warrior #" << npcType << " team " << team
                   << " threw a grenade!" << RESET << std::endl;
-        pGrenade->setIsExploded(true);
         ammo -= 5;
         grenadeCounter = 0;
         hasThrownGrenade = true;

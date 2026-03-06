@@ -1,21 +1,56 @@
 #include "Grenade.h"
+#include "glut.h"
 #include <cmath>
 
-const double PI = 3.14;
-Grenade::Grenade(double xPos, double yPos, int team)
-{
-	int i;
-	double angle, teta = (360 / NUM_BULLETS) * PI / 180;
-	x = xPos;
-	y = yPos;
+const double PI = 3.14159265358979;
 
-	for (i = 0, angle = 0; i < NUM_BULLETS; i++, angle += teta)
-	{
-		// Grenade fragments: 50% of MAX_HP per direct hit
+Grenade::Grenade(double startX_, double startY_, double targetX_, double targetY_, int team_)
+{
+	startX = startX_;
+	startY = startY_;
+	targetX = targetX_;
+	targetY = targetY_;
+	x = startX;
+	y = startY;
+	team = team_;
+	isExploded = false;
+	spawnTimeMs = glutGet(GLUT_ELAPSED_TIME);
+	for (int i = 0; i < NUM_BULLETS; i++)
+		bullets[i] = nullptr;
+}
+
+Grenade::~Grenade()
+{
+	for (int i = 0; i < NUM_BULLETS; i++) {
+		if (bullets[i] != nullptr) {
+			delete bullets[i];
+			bullets[i] = nullptr;
+		}
+	}
+}
+
+void Grenade::createFragments()
+{
+	double teta = (2.0 * PI) / NUM_BULLETS;
+	for (int i = 0; i < NUM_BULLETS; i++) {
+		double angle = i * teta;
 		bullets[i] = new Bullet(x, y, angle, team, 0.5 * MAX_HP);
 	}
-	isExploded = false;
-	this->team = team;
+}
+
+void Grenade::Update()
+{
+	if (isExploded) return;
+	int elapsed = glutGet(GLUT_ELAPSED_TIME) - spawnTimeMs;
+	if (elapsed >= GRENADE_FUSE_MS) {
+		createFragments();
+		setIsExploded(true);
+		return;
+	}
+	double t = (double)elapsed / (double)GRENADE_FUSE_MS;
+	if (t > 1.0) t = 1.0;
+	x = startX + (targetX - startX) * t;
+	y = startY + (targetY - startY) * t + 8.0 * 4.0 * t * (1.0 - t);
 }
 
 void Grenade::Explode(int map[MSZ][MSZ], NPC** team1, NPC** team2, double securityMap[MSZ][MSZ])
@@ -28,7 +63,8 @@ void Grenade::Explode(int map[MSZ][MSZ], NPC** team1, NPC** team2, double securi
 
 	for (int i = 0; i < NUM_BULLETS; i++)
 	{
-		if (bullets[i] && bullets[i]->getIsMoving())
+		if (bullets[i] == nullptr) continue;
+		if (bullets[i]->getIsMoving())
 		{
 			double bulletX = bullets[i]->getX();
 			double bulletY = bullets[i]->getY();
@@ -65,22 +101,26 @@ bool Grenade::getIsExploded() const {
 void Grenade::setIsExploded(bool value)
 {
 	isExploded = value;
-	int i;
-
-	for (i = 0; i < NUM_BULLETS; i++)
-	{
-		bullets[i]->setIsMoving(value);
+	for (int i = 0; i < NUM_BULLETS; i++) {
+		if (bullets[i] != nullptr)
+			bullets[i]->setIsMoving(value);
 	}
-
 }
 
 void Grenade::Show()
 {
-	int i;
-
-	for (i = 0; i < NUM_BULLETS; i++)
-	{
-		bullets[i]->Show();
+	if (!isExploded) {
+		glColor3d(0.2, 0.5, 0.2);
+		glBegin(GL_QUADS);
+		glVertex2d(x - 0.4, y - 0.4);
+		glVertex2d(x + 0.4, y - 0.4);
+		glVertex2d(x + 0.4, y + 0.4);
+		glVertex2d(x - 0.4, y + 0.4);
+		glEnd();
+		return;
 	}
-
+	for (int i = 0; i < NUM_BULLETS; i++) {
+		if (bullets[i] != nullptr)
+			bullets[i]->Show();
+	}
 }

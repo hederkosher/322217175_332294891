@@ -104,16 +104,19 @@ void MedicNPC::DoSomeWork()
 	}
 
 	// Autonomous: if no target and have medicine, scan teammates
+	if (healMessageCooldown > 0) healMessageCooldown--;
 	scanCooldown--;
 	if (!pTarget && medicine >= MEDICINE_MAX * 0.3 && !isFillingMedicine && scanCooldown <= 0)
 	{
 		NPC* injured = FindInjuredTeammate();
 		if (injured) {
 			pTarget = injured;
-			std::string color = (team == 1 ? TEAM1 : TEAM2);
-			std::cout << color << "Medic team " << team
-				<< ": detected injured teammate, going to heal!" << RESET << std::endl;
-
+			if (healMessageCooldown <= 0) {
+				std::string color = (team == 1 ? TEAM1 : TEAM2);
+				std::cout << color << "Medic team " << team
+					<< ": detected injured teammate, going to heal!" << RESET << std::endl;
+				healMessageCooldown = 90;
+			}
 			if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
 			pCurrentState = new GoToTarget();
 			pCurrentState->OnEnter(this);
@@ -242,6 +245,7 @@ void MedicNPC::DoSomeWork()
 }
 
 void MedicNPC::setMedicine(double value) { medicine = value; }
+double MedicNPC::getMedicine() const { return medicine; }
 
 void MedicNPC::show() {
 	NPC::show();

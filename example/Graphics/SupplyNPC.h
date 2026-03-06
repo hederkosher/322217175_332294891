@@ -30,6 +30,7 @@ public:
   bool getIsFillingAmmo();
   void setIsFillingAmmo(bool isFill);
   void setAmmo(double value);
+  double getAmmo() const;
   bool getStayedAtArmory();
   void setStayedAtArmory(bool stayed);
   void DoSomeWork();

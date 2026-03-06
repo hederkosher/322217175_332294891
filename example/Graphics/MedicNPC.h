@@ -15,6 +15,7 @@ private:
 
     int scanCooldown = 0;
     int followCooldown = 0;
+    int healMessageCooldown = 0;
     bool isFleeing = false;
 
 public:
@@ -32,6 +33,7 @@ public:
     void setStayedAtMedicine(bool stayed);
     void DoSomeWork();
     void setMedicine(double value);
+    double getMedicine() const;
     void show() override;
 
     // Autonomous teammate scanning

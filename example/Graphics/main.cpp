@@ -2,8 +2,10 @@
 #include "Definitions.h"
 #include "Grenade.h"
 #include "Map.h"
+#include "MedicNPC.h"
 #include "NPC.h"
 #include "SecurityMap.h"
+#include "SupplyNPC.h"
 #include "WarriorNPC.h"
 #include "glut.h"
 #include <iostream>
@@ -11,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include <string.h>
 #include <time.h>
 
 using namespace std;
@@ -21,8 +24,10 @@ bool gameStarted  = false;
 const int MATCH_DURATION_MS = 60000; // 1 minute
 int gameStartTime = 0;
 
-const int W = 900;
-const int H = 600;
+const int PANEL_W = 270;
+const int GAME_SIZE = 800;
+const int W = PANEL_W + GAME_SIZE + PANEL_W;
+const int H = 700;
 
 NPC *team1[TEAM_SIZE];
 NPC *team2[TEAM_SIZE];
@@ -46,22 +51,34 @@ static void drawStartScreen() {
   glVertex2d(100, 100); glVertex2d(0, 100);
   glEnd();
 
-  // 5-line "SMART WARFARE" ASCII art logo in cyan
+  // "SMART WARFARE" ASCII art logo in cyan
   static const char *logo[5] = {
-    " ____  __  __    _    ____ _____   __        ___    ____  _____ _    ____  ___ ",
-    "/ ___||  \\/  |  / \\  |  _ \\_   _|  \\ \\      / / \\  |  _ \\|  ___/ \\  |  _ \\| __|",
-    "\\___ \\| |\\/| | / _ \\ | |_) || |     \\ \\ /\\ / / _ \\ |    /| |_ / _ \\ |    /|  _|",
-    " ___) | |  | |/ ___ \\|  _ < | |      \\ V  V / ___ \\| |\\ \\|  _/ ___ \\| |\\ \\| |___",
-    "|____/|_|  |_/_/   \\_\\_| \\_\\|_|       \\_/\\_/_/   \\_\\_| \\_\\_|/_/   \\_\\_| \\_\\____|"
+    "  ____                       _    __        __         __                ",
+    " / ___| _ __ ___   __ _ _ __| |_  \\ \\      / /_ _ _ __/ _| __ _ _ __ ___ ",
+    " \\___ \\| '_ ` _ \\ / _` | '__| __|  \\ \\ /\\ / / _` | '__| |_ / _` | '__/ _ \\",
+    "  ___) | | | | | | (_| | |  | |_    \\ V  V / (_| | |  |  _| (_| | | |  __/",
+    " |____/|_| |_| |_|\\__,_|_|   \\__|    \\_/\\_/ \\__,_|_|  |_|  \\__,_|_|  \\___|"
   };
   void *smallFont = GLUT_BITMAP_9_BY_15;
   glColor3d(0.0, 0.9, 1.0);
   for (int i = 0; i < 5; i++)
-    drawText(10.0, 83.0 - i * 4.0, logo[i], smallFont);
+    drawText(8.0, 80.0 - i * 3.8, logo[i], smallFont);
 
-  // Call-to-action
+  // Call-to-action (centered, bold effect by double-draw)
   glColor3d(0.0, 0.9, 1.0);
-  drawText(30.0, 48.0, "Press any key to start", GLUT_BITMAP_TIMES_ROMAN_24);
+  const double startX = 30.0;  // ~center for 32-char line in 0-100
+  const double startY = 55.0;
+  drawText(startX, startY, "Press any key or click to start", GLUT_BITMAP_TIMES_ROMAN_24);
+  drawText(startX + 0.12, startY, "Press any key or click to start", GLUT_BITMAP_TIMES_ROMAN_24);
+
+  // Win rules (centered, bold effect by double-draw)
+  glColor3d(0.85, 0.85, 0.9);
+  const double rulesX = 15.0;  // ~center for 62-char line in 0-100
+  const double rulesY = 40.0;
+  drawText(rulesX, rulesY, "Win: Kill all enemy warriors, or have most HP when time runs out.", smallFont);
+  drawText(rulesX + 0.06, rulesY, "Win: Kill all enemy warriors, or have most HP when time runs out.", smallFont);
+  drawText(rulesX + 0.12, rulesY, "Win: Kill all enemy warriors, or have most HP when time runs out.", smallFont);
+  drawText(rulesX + 0.06, rulesY - 0.05, "Win: Kill all enemy warriors, or have most HP when time runs out.", smallFont);
 
   // Right-click hint
   glColor3d(0.7, 0.7, 0.7);
@@ -76,14 +93,7 @@ void init() {
   InitMap(team1, team2);
   CreateSecurityMap();
 
-  cout << GAME_END << R"(
-    _    ___   ____        _     _ _               
-   / \  |_ _| / ___|  ___ | | __| (_) ___ _ __ ___ 
-  / _ \  | |  \___ \ / _ \| |/ _` | |/ _ \ '__/ __|
- / ___ \ | |   ___) | (_) | | (_| | |  __/ |  \__ \
-/_/   \_\___| |____/ \___/|_|\__,_|_|\___|_|  |___/
-)" << RESET
-       << endl;
+  cout << GAME_END << "Smart Warfare" << RESET << endl;
 
   cout << TEAM1 << "Team 1: 2 Warriors + 1 Medic + 1 Supply" << RESET << endl;
   cout << TEAM2 << "Team 2: 2 Warriors + 1 Medic + 1 Supply" << RESET << endl;
@@ -93,9 +103,22 @@ void init() {
   // gameStartTime is set when the player presses a key to start
 }
 
-void keyboard(unsigned char /*key*/, int /*x*/, int /*y*/) {
+void keyboard(unsigned char key, int /*x*/, int /*y*/) {
+  if (gameWinner != 0 && (key == 'r' || key == 'R')) {
+    for (int i = 0; i < TEAM_SIZE; i++) {
+      if (team1[i]) { delete team1[i]; team1[i] = nullptr; }
+      if (team2[i]) { delete team2[i]; team2[i] = nullptr; }
+    }
+    srand((unsigned)time(NULL));
+    InitMap(team1, team2);
+    CreateSecurityMap();
+    gameWinner = 0;
+    gameStarted = true;
+    gameStartTime = glutGet(GLUT_ELAPSED_TIME);
+    return;
+  }
   if (!gameStarted) {
-    gameStarted  = true;
+    gameStarted = true;
     gameStartTime = glutGet(GLUT_ELAPSED_TIME);
   }
 }
@@ -114,8 +137,54 @@ void showGranade(NPCType warrior, NPC **team) {
   }
 }
 
+static const char* s_names[TEAM_SIZE] = { "Warrior 1", "Warrior 2", "Medic", "Supply" };
+
+static void drawTeamStats(NPC **team, double x, double yBase, double lineHeight, void *font) {
+  for (int i = 0; i < TEAM_SIZE; i++) {
+    double y = yBase - i * lineHeight;
+    if (team[i] == nullptr) {
+      glColor3d(0.5, 0.5, 0.5);
+      char buf[32];
+      sprintf(buf, "%s --", s_names[i]);
+      drawText(x, y, buf, font);
+      continue;
+    }
+    int hp = (int)team[i]->getHp();
+    if (team[i]->getTeam() == 1)
+      glColor3d(1.0, 0.4, 0.0);
+    else
+      glColor3d(0.0, 0.8, 1.0);
+    char buf[80];
+    sprintf(buf, "%s  HP:%d", s_names[i], hp);
+    if (auto wn = dynamic_cast<WarriorNPC *>(team[i])) {
+      int ammo = (int)wn->getAmmo();
+      sprintf(buf + strlen(buf), "  Ammo:%d", ammo);
+    } else if (auto mn = dynamic_cast<MedicNPC *>(team[i])) {
+      int med = (int)mn->getMedicine();
+      sprintf(buf + strlen(buf), "  Med:%d", med);
+    } else if (auto sn = dynamic_cast<SupplyNPC *>(team[i])) {
+      int ammo = (int)sn->getAmmo();
+      sprintf(buf + strlen(buf), "  Ammo:%d", ammo);
+    }
+    drawText(x, y, buf, font);
+  }
+}
+
 void display() {
   glClear(GL_COLOR_BUFFER_BIT);
+
+  void *statsFont = GLUT_BITMAP_9_BY_15;
+
+  // Left stats panel
+  glViewport(0, 0, PANEL_W, H);
+  glLoadIdentity();
+  glOrtho(0, PANEL_W, 0, H, -1, 1);
+  drawTeamStats(team1, 10.0, H - 20.0, 28.0, statsFont);
+
+  // Center: game map and entities (world 0-100 x 0-100)
+  glViewport(PANEL_W, 0, GAME_SIZE, H);
+  glLoadIdentity();
+  glOrtho(0, 100, 0, 100, -1, 1);
 
   DrawMap();
 
@@ -146,7 +215,6 @@ void display() {
     char timerBuf[16];
     sprintf(timerBuf, "%d:%02d", mins, secs);
 
-    // White normally, urgent red when < 10 s
     if (remaining < 10)
       glColor3d(1.0, 0.2, 0.2);
     else
@@ -158,28 +226,37 @@ void display() {
   if (gameWinner != 0) {
     void *font = GLUT_BITMAP_TIMES_ROMAN_24;
     if (gameWinner == 1) {
-      glColor3d(1.0, 0.4, 0.0);          // team 1 orange-red
+      glColor3d(1.0, 0.4, 0.0);
       drawText(38, 54, "TEAM 1 WINS!", font);
     } else if (gameWinner == 2) {
-      glColor3d(0.0, 0.8, 1.0);          // team 2 cyan
+      glColor3d(0.0, 0.8, 1.0);
       drawText(38, 54, "TEAM 2 WINS!", font);
     } else {
-      glColor3d(1.0, 0.8, 0.0);          // draw: yellow
+      glColor3d(1.0, 0.8, 0.0);
       drawText(44, 54, "DRAW!", font);
     }
     glColor3d(0.7, 0.7, 0.7);
     drawText(26, 46, "Right-click to switch views", GLUT_BITMAP_9_BY_15);
+    drawText(22, 40, "Press R to restart the game", GLUT_BITMAP_9_BY_15);
   }
 
-  // Start-screen overlay drawn last so it sits on top of the map preview
   if (!gameStarted)
     drawStartScreen();
+
+  // Right stats panel
+  glViewport(PANEL_W + GAME_SIZE, 0, PANEL_W, H);
+  glLoadIdentity();
+  glOrtho(0, PANEL_W, 0, H, -1, 1);
+  drawTeamStats(team2, 10.0, H - 20.0, 28.0, statsFont);
 
   glutSwapBuffers();
 }
 
 void displaySecurityMap() {
   glClear(GL_COLOR_BUFFER_BIT);
+  glViewport(0, 0, W, H);
+  glLoadIdentity();
+  glOrtho(0, 100, 0, 100, -1, 1);
   DrawSecurityMap();
   glutSwapBuffers();
 }
@@ -199,15 +276,18 @@ void BulletMovement(NPCType warrior, NPC **team) {
 
 void GranadeMovement(NPCType warrior, NPC **team) {
   if (auto wn = dynamic_cast<WarriorNPC *>(team[warrior])) {
-    if (wn->getGrenade() != nullptr) {
-      if (wn->getGrenade()->getIsExploded()) {
-        wn->getGrenade()->Explode(map, team1, team2, securityMap);
-      } else {
+    if (wn->getGrenade() == nullptr) {
+      wn->setGrenade(nullptr);
+      return;
+    }
+    if (!wn->getGrenade()->getIsExploded()) {
+      wn->getGrenade()->Update();
+    } else {
+      wn->getGrenade()->Explode(map, team1, team2, securityMap);
+      if (!wn->getGrenade()->getIsExploded()) {
         delete wn->getGrenade();
         wn->setGrenade(nullptr);
       }
-    } else {
-      wn->setGrenade(nullptr);
     }
   }
 }
@@ -330,8 +410,10 @@ void idle() {
   glutPostRedisplay();
 }
 
-void MouseClick(int button, int state, int x, int y) {
-  if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+void MouseClick(int /*button*/, int state, int /*x*/, int /*y*/) {
+  if (!gameStarted && state == GLUT_DOWN) {
+    gameStarted = true;
+    gameStartTime = glutGet(GLUT_ELAPSED_TIME);
   }
 }
 
@@ -351,7 +433,7 @@ int main(int argc, char *argv[]) {
   glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
   glutInitWindowSize(W, H);
   glutInitWindowPosition(400, 100);
-  glutCreateWindow("AI Soldiers - Maze Battle");
+  glutCreateWindow("Smart Warfare");
 
   glutDisplayFunc(display);
   glutIdleFunc(idle);
