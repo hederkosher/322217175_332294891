@@ -98,10 +98,13 @@ void WarriorNPC::EvaluatePriorities() {
   // Priority 1: critical HP ? flee to cover or seek medic
   if (hpRatio < hpFleeThreshold) {
     if (!dynamic_cast<GoToDefenseState *>(pCurrentState)) {
-      std::string color = (team == 1 ? TEAM1 : TEAM2);
-      std::cout << color << "Warrior #" << npcType << " team " << team
-                << ": HP critical (" << (int)hp << "), FLEEING!" << RESET
-                << std::endl;
+      if (!printedHpFleeMsg) {
+        std::string color = (team == 1 ? TEAM1 : TEAM2);
+        std::cout << color << "Warrior #" << npcType << " team " << team
+                  << ": HP critical (" << (int)hp << "), FLEEING!" << RESET
+                  << std::endl;
+        printedHpFleeMsg = true;
+      }
 
       if (pCurrentState) {
         pCurrentState->OnExit(this);
@@ -122,14 +125,20 @@ void WarriorNPC::EvaluatePriorities() {
       }
       return;
     }
+  } else {
+    // Condition cleared, allow message again on next critical event
+    printedHpFleeMsg = false;
   }
 
   // Priority 2: low ammo ? seek supply
   if (ammoRatio < ammoFleeThreshold && isAttacking) {
-    std::string color = (team == 1 ? TEAM1 : TEAM2);
-    std::cout << color << "Warrior #" << npcType << " team " << team
-              << ": ammo low (" << (int)ammo << "), seeking supply!" << RESET
-              << std::endl;
+    if (!printedLowAmmoMsg) {
+      std::string color = (team == 1 ? TEAM1 : TEAM2);
+      std::cout << color << "Warrior #" << npcType << " team " << team
+                << ": ammo low (" << (int)ammo << "), seeking supply!" << RESET
+                << std::endl;
+      printedLowAmmoMsg = true;
+    }
 
     if (pCurrentState) {
       pCurrentState->OnExit(this);
@@ -150,13 +159,32 @@ void WarriorNPC::EvaluatePriorities() {
     }
     return;
   }
+  else if (ammoRatio >= ammoFleeThreshold) {
+    // Reset when ammo is back to a safe level
+    printedLowAmmoMsg = false;
+  }
 
-  // Priority 3: enemy in same room ? attack
+  // Priority 3: enemy in same room ? attack (only if line-of-sight is clear)
   NPC *enemy = FindEnemyInSameRoom();
-  if (enemy && ammo > 0 && !dynamic_cast<AttackState *>(pCurrentState)) {
-    std::string color = (team == 1 ? TEAM1 : TEAM2);
-    std::cout << color << "Warrior #" << npcType << " team " << team
-              << ": ENEMY IN ROOM! Attacking!" << RESET << std::endl;
+  bool canAttack = false;
+  bool enemyHasLOS = false;
+  if (enemy) {
+    double ex, ey;
+    enemy->getPosition(ex, ey);
+    double targetCx = ex + 1.5;
+    double targetCy = ey + 1.5;
+    enemyHasLOS = HasLineOfSight(targetCx, targetCy);
+    canAttack = enemyHasLOS;
+  }
+
+  if (enemy && canAttack && ammo > 0 &&
+      !dynamic_cast<AttackState *>(pCurrentState)) {
+    if (!printedAttackMsg) {
+      std::string color = (team == 1 ? TEAM1 : TEAM2);
+      std::cout << color << "Warrior #" << npcType << " team " << team
+                << ": ENEMY IN ROOM! Attacking!" << RESET << std::endl;
+      printedAttackMsg = true;
+    }
 
     if (pCurrentState) {
       pCurrentState->OnExit(this);
@@ -164,6 +192,7 @@ void WarriorNPC::EvaluatePriorities() {
     }
     pCurrentState = new AttackState();
     pCurrentState->OnEnter(this);
+
     return;
   }
 
@@ -175,6 +204,7 @@ void WarriorNPC::EvaluatePriorities() {
     }
     pCurrentState = new MoveToTargetState();
     pCurrentState->OnEnter(this);
+    printedAttackMsg = false;
   }
 }
 
@@ -252,28 +282,46 @@ void WarriorNPC::DoSomeWork() {
     if (enemy && ammo > 0) {
       grenadeCounter++;
 
-      // Every 180 frames throw a grenade instead of a bullet
-      if (grenadeCounter >= 180 && pGrenade == nullptr && ammo >= 5) {
-        double ex, ey;
-        enemy->getPosition(ex, ey);
-        pGrenade = new Grenade(ex + 1.5, ey + 1.5, team);
+      // Check line-of-sight to enemy; if blocked by WALL/STONE, stop shooting and
+      // reposition instead of wasting bullets on the obstacle.
+      double ex, ey;
+      enemy->getPosition(ex, ey);
+      double targetCx = ex + 1.5;
+      double targetCy = ey + 1.5;
+
+      if (!HasLineOfSight(targetCx, targetCy)) {
+        // Plan a path toward the enemy's current cell and switch back to movement
+        setTarget(targetCx, targetCy);
+        PlanPathTo();
+        if (auto attackState = dynamic_cast<AttackState *>(pCurrentState)) {
+          attackState->OnExit(this);
+          delete pCurrentState;
+          pCurrentState = new MoveToTargetState();
+          pCurrentState->OnEnter(this);
+        }
+        return;
+      }
+
+      // Every 180 frames throw a grenade instead of a bullet (only once per warrior)
+      if (!hasThrownGrenade && grenadeCounter >= 180 && pGrenade == nullptr && ammo >= 5) {
+        pGrenade = new Grenade(targetCx, targetCy, team);
         std::cout << GRENADE << "Warrior #" << npcType << " team " << team
                   << " threw a grenade!" << RESET << std::endl;
         pGrenade->setIsExploded(true);
         ammo -= 5;
         grenadeCounter = 0;
+        hasThrownGrenade = true;
       } else {
         // Fire a single bullet
         setAmmo(ammo - 0.01);
 
-        double ex, ey;
-        enemy->getPosition(ex, ey);
-        double dx = (ex + 1.5) - (x + 1.5);
-        double dy = (ey + 1.5) - (y + 1.5);
+        double dx = targetCx - (x + 1.5);
+        double dy = targetCy - (y + 1.5);
         double angle = atan2(dy, dx);
 
         if (pBullet == nullptr) {
-          pBullet = new Bullet(x + 1.5, y + 1.5, angle, team);
+          // Regular bullet: 15% of MAX_HP
+          pBullet = new Bullet(x + 1.5, y + 1.5, angle, team, 0.15 * MAX_HP);
           pBullet->setIsMoving(true);
         }
       }

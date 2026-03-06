@@ -8,11 +8,15 @@ private:
   bool isMoving;
   double dirX, dirY;
   int team;
+  double damage;
 
 public:
-  Bullet(double xPos, double yPos, double angle, int team);
+  Bullet(double xPos, double yPos, double angle, int team, double damage);
   void Move(int map[MSZ][MSZ], NPC **team1, NPC **team2,
             double securityMap[MSZ][MSZ]);
+  void Move(int map[MSZ][MSZ], NPC **team1, NPC **team2,
+            double securityMap[MSZ][MSZ],
+            bool hitTeam1[TEAM_SIZE], bool hitTeam2[TEAM_SIZE]);
   void Show();
   void setIsMoving(bool value) { isMoving = value; }
   bool getIsMoving() const;

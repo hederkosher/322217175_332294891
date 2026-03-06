@@ -2,7 +2,6 @@
 #include <math.h>
 #include "glut.h"
 
-
 namespace {
     bool CheckCollision(double bulletX, double bulletY, NPC* targetNpc) {
         if (!targetNpc) return false;
@@ -22,7 +21,7 @@ namespace {
     }
 }
 
-Bullet::Bullet(double xPos, double yPos, double angle, int team)
+Bullet::Bullet(double xPos, double yPos, double angle, int team, double damage)
 {
     x = xPos;
     y = yPos;
@@ -30,13 +29,13 @@ Bullet::Bullet(double xPos, double yPos, double angle, int team)
     dirY = sin(angle);
     isMoving = false;
     this->team = team;
+    this->damage = damage;
 }
 
 void Bullet::Move(int map[MSZ][MSZ], NPC** team1, NPC** team2, double securityMap[MSZ][MSZ])
 {
     if (!isMoving) return;
 
-    const double DAMAGE_HP = 60.0;
     double nextX = x + SPEED * dirX;
     double nextY = y + SPEED * dirY;
 
@@ -63,7 +62,55 @@ void Bullet::Move(int map[MSZ][MSZ], NPC** team1, NPC** team2, double securityMa
     {
         if (CheckCollision(nextX, nextY, targetTeam[i]))
         {
-            targetTeam[i]->setHp(targetTeam[i]->getHp() - DAMAGE_HP);
+            targetTeam[i]->setHp(targetTeam[i]->getHp() - damage);
+            isMoving = false;
+            return;
+        }
+    }
+
+    x = nextX;
+    y = nextY;
+    securityMap[gridX][gridY] += SECURITY;
+}
+
+void Bullet::Move(int map[MSZ][MSZ], NPC** team1, NPC** team2,
+                  double securityMap[MSZ][MSZ],
+                  bool hitTeam1[TEAM_SIZE], bool hitTeam2[TEAM_SIZE])
+{
+    if (!isMoving) return;
+
+    double nextX = x + SPEED * dirX;
+    double nextY = y + SPEED * dirY;
+
+    int gridX = static_cast<int>(nextX);
+    int gridY = static_cast<int>(nextY);
+
+    if (nextX < 0 || nextX >= MSZ || nextY < 0 || nextY >= MSZ) {
+        isMoving = false;
+        return;
+    }
+
+    int value = map[gridX][gridY];
+
+    // Bullets stop at walls and stone obstacles
+    if (value == WALL || value == STONE) {
+        isMoving = false;
+        return;
+    }
+
+    // Only hit enemies, no friendly fire
+    NPC** targetTeam = (team == 1) ? team2 : team1;
+
+    for (int i = 0; i < TEAM_SIZE; i++)
+    {
+        if (CheckCollision(nextX, nextY, targetTeam[i]))
+        {
+            // Ensure each NPC is damaged at most once per grenade explosion
+            bool* hitArray = (team == 1) ? hitTeam2 : hitTeam1;
+            if (!hitArray[i]) {
+                targetTeam[i]->setHp(targetTeam[i]->getHp() - damage);
+                hitArray[i] = true;
+            }
             isMoving = false;
             return;
         }

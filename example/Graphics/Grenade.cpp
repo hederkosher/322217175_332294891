@@ -11,7 +11,8 @@ Grenade::Grenade(double xPos, double yPos, int team)
 
 	for (i = 0, angle = 0; i < NUM_BULLETS; i++, angle += teta)
 	{
-		bullets[i] = new Bullet(x, y, angle, team);
+		// Grenade fragments: 50% of MAX_HP per direct hit
+		bullets[i] = new Bullet(x, y, angle, team, 0.5 * MAX_HP);
 	}
 	isExploded = false;
 	this->team = team;
@@ -21,6 +22,9 @@ void Grenade::Explode(int map[MSZ][MSZ], NPC** team1, NPC** team2, double securi
 {
 	const double MAX_RANGE = 20.0;
 	bool anyBulletIsStillMoving = false; //explode is still ongoing
+
+	bool hitTeam1[TEAM_SIZE] = { false };
+	bool hitTeam2[TEAM_SIZE] = { false };
 
 	for (int i = 0; i < NUM_BULLETS; i++)
 	{
@@ -40,7 +44,7 @@ void Grenade::Explode(int map[MSZ][MSZ], NPC** team1, NPC** team2, double securi
 			}
 			else
 			{
-				bullets[i]->Move(map, team1, team2, securityMap);
+				bullets[i]->Move(map, team1, team2, securityMap, hitTeam1, hitTeam2);
 				if (bullets[i]->getIsMoving())
 				{
 					anyBulletIsStillMoving = true;

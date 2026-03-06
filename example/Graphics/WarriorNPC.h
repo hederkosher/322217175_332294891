@@ -11,6 +11,12 @@ private:
     Bullet* pBullet = nullptr;
     Grenade* pGrenade = nullptr;
     bool arrivedAtTarget = false;
+  bool hasThrownGrenade = false;
+
+  // Message throttling flags
+  bool printedHpFleeMsg = false;
+  bool printedLowAmmoMsg = false;
+  bool printedAttackMsg = false;
 
     // Personality-derived thresholds
     double hpFleeThreshold;
