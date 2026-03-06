@@ -216,6 +216,7 @@ void WarriorNPC::EvaluatePriorities() {
       pCurrentState->OnExit(this);
       delete pCurrentState;
     }
+    blockedShotsCounter = 0;
     pCurrentState = new AttackState();
     pCurrentState->OnEnter(this);
 
@@ -324,6 +325,7 @@ void WarriorNPC::DoSomeWork() {
 
       if (!HasLineOfSight(targetCx, targetCy)) {
         // Plan a path toward the enemy's current cell and switch back to movement
+        blockedShotsCounter = 0;
         setTarget(targetCx, targetCy);
         PlanPathTo();
         if (auto attackState = dynamic_cast<AttackState *>(pCurrentState)) {
@@ -333,6 +335,33 @@ void WarriorNPC::DoSomeWork() {
           pCurrentState->OnEnter(this);
         }
         return;
+      }
+
+      // If the previous bullet stopped well before reaching the enemy it hit an
+      // obstacle (Bresenham LOS can miss thin diagonal corners). After 2 such
+      // consecutive blocked shots, stop attacking and reposition.
+      if (pBullet != nullptr && !pBullet->getIsMoving()) {
+        double bx = pBullet->getX();
+        double by = pBullet->getY();
+        double distBulletToEnemy = Distance(bx, by, targetCx, targetCy);
+        double distToEnemy = Distance(x + 1.5, y + 1.5, targetCx, targetCy);
+        if (distToEnemy > 0.0 && distBulletToEnemy > distToEnemy * 0.4) {
+          blockedShotsCounter++;
+        } else {
+          blockedShotsCounter = 0;
+        }
+        if (blockedShotsCounter >= 2) {
+          blockedShotsCounter = 0;
+          setTarget(targetCx, targetCy);
+          PlanPathTo();
+          if (auto attackState = dynamic_cast<AttackState *>(pCurrentState)) {
+            attackState->OnExit(this);
+            delete pCurrentState;
+            pCurrentState = new MoveToTargetState();
+            pCurrentState->OnEnter(this);
+          }
+          return;
+        }
       }
 
       // Every 180 frames throw a grenade instead of a bullet (only once per warrior)

@@ -32,6 +32,9 @@ private:
     // Flee repath counter (replan path to medic/supply periodically)
     int fleeRepathCounter = 0;
 
+    // Counts consecutive shots that were blocked by an obstacle (not enemy hit)
+    int blockedShotsCounter = 0;
+
 public:
     WarriorNPC(double positionX, double positionY, char character, int team, int type);
     bool isInRisk() const override;
