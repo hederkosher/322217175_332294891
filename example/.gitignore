@@ -2,6 +2,21 @@
 *.mp4
 
 # Build outputs
+*.log
+*.ilk
 *.obj
+*.exe
+*.pdb
 Graphics/Debug/Graphics.exe
 Graphics/Debug/Graphics.pdb
+Graphics/Debug/Graphics.ilk
+Graphics/Debug/Graphics.tlog
+Graphics/Debug/Graphics.tlog/
+Graphics/Debug/Graphics.tlog/cl.command.1.tlog
+Graphics/Debug/Graphics.tlog/cl.items.tlog
+Graphics/Debug/Graphics.tlog/cl.read.1.tlog
+Graphics/Debug/Graphics.tlog/cl.write.1.tlog
+Graphics/Debug/Graphics.tlog/link.command.1.tlog
+Graphics/Debug/Graphics.tlog/link.read.1.tlog
+Graphics/Debug/Graphics.tlog/link.secondary.1.tlog
+Graphics/Debug/Graphics.tlog/link.write.1.tlog
