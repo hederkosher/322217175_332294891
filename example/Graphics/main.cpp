@@ -197,6 +197,9 @@ void idle() {
   if (gameWinner != 0)
     return;
 
+  // Security map: decay + update from NPC positions in combat rooms
+  UpdateSecurityMap(team1, team2);
+
   // Visibility update for all NPCs
   for (int i = 0; i < TEAM_SIZE; i++) {
     if (team1[i])

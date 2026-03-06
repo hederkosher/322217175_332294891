@@ -2,7 +2,6 @@
 #include "AttackState.h"
 #include "Bullet.h"
 #include "GoToDefenseState.h"
-#include "IdleState.h"
 #include "Map.h"
 #include "MoveToTargetState.h"
 #include <algorithm>
@@ -202,8 +201,6 @@ void WarriorNPC::SearchForEnemies() {
   }
 }
 
-static int warrior_counter_grenade_frames = 0;
-
 void WarriorNPC::DoSomeWork() {
   // Evaluate priorities (may force state transitions)
   EvaluatePriorities();
@@ -247,26 +244,10 @@ void WarriorNPC::DoSomeWork() {
     arrivedAtTarget = false;
     NPC *enemy = FindEnemyInSameRoom();
     if (enemy && ammo > 0) {
-      setAmmo(ammo - 0.01);
+      grenadeCounter++;
 
-      double ex, ey;
-      enemy->getPosition(ex, ey);
-      double dx = (ex + 1.5) - (x + 1.5);
-      double dy = (ey + 1.5) - (y + 1.5);
-      double angle = atan2(dy, dx);
-
-      if (pBullet == nullptr) {
-        pBullet = new Bullet(x + 1.5, y + 1.5, angle, team);
-        pBullet->setIsMoving(true);
-      }
-    }
-  }
-
-  // Grenade throwing (periodic, when idle and have ammo)
-  if (auto idleState = dynamic_cast<IdleState *>(getCurrentState())) {
-    if (warrior_counter_grenade_frames % 180 == 0) {
-      NPC *enemy = FindEnemyInSameRoom();
-      if (enemy && pGrenade == nullptr && ammo >= 5) {
+      // Every 180 frames throw a grenade instead of a bullet
+      if (grenadeCounter >= 180 && pGrenade == nullptr && ammo >= 5) {
         double ex, ey;
         enemy->getPosition(ex, ey);
         pGrenade = new Grenade(ex + 1.5, ey + 1.5, team);
@@ -274,9 +255,23 @@ void WarriorNPC::DoSomeWork() {
                   << " threw a grenade!" << RESET << std::endl;
         pGrenade->setIsExploded(true);
         ammo -= 5;
+        grenadeCounter = 0;
+      } else {
+        // Fire a single bullet
+        setAmmo(ammo - 0.01);
+
+        double ex, ey;
+        enemy->getPosition(ex, ey);
+        double dx = (ex + 1.5) - (x + 1.5);
+        double dy = (ey + 1.5) - (y + 1.5);
+        double angle = atan2(dy, dx);
+
+        if (pBullet == nullptr) {
+          pBullet = new Bullet(x + 1.5, y + 1.5, angle, team);
+          pBullet->setIsMoving(true);
+        }
       }
     }
-    warrior_counter_grenade_frames++;
   }
 }
 

@@ -20,6 +20,9 @@ private:
     int searchTargetRoom = -1;
     int framesAtTarget = 0;
 
+    // Grenade attack cooldown
+    int grenadeCounter = 0;
+
 public:
     WarriorNPC(double positionX, double positionY, char character, int team, int type);
     bool isInRisk() const override;
