@@ -1,5 +1,8 @@
 #include "SupplyNPC.h"
 #include "GoToWarrior.h"
+#include "GoToDefenseState.h"
+#include "IdleState.h"
+#include "MoveToTargetState.h"
 #include <iostream>
 
 static int counter = 0;
@@ -45,6 +48,71 @@ WarriorNPC *SupplyNPC::FindWarriorNeedingAmmo() {
 }
 
 void SupplyNPC::DoSomeWork() {
+  // Priority 0: Self-preservation -- flee when HP is critically low
+  double fleeThreshold = MAX_HP * 0.4;
+  if (hp < fleeThreshold && hp > 0) {
+    if (!isFleeing) {
+      isFleeing = true;
+      std::string color = (team == 1 ? TEAM1 : TEAM2);
+      std::cout << color << "Supply team " << team
+                << ": HP critical (" << (int)hp << "), retreating!" << RESET
+                << std::endl;
+
+      // Interrupt current activity
+      isGivingAmmo = false;
+      isFillingAmmo = false;
+      stayedAtArmory = false;
+      goToWarrior = false;
+      pWarrior = nullptr;
+
+      if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+
+      // Flee to medic if alive, otherwise take cover
+      if (myTeam && myTeam[2] && myTeam[2]->getHp() > 0) {
+        double mx, my;
+        myTeam[2]->getPosition(mx, my);
+        setTarget(mx, my);
+        PlanPathTo();
+        fleeRepathCounter = 0;
+        pCurrentState = new MoveToTargetState();
+        pCurrentState->OnEnter(this);
+      } else {
+        pCurrentState = new GoToDefenseState();
+        pCurrentState->OnEnter(this);
+      }
+    }
+
+    // Periodically replan path to medic (medic moves)
+    if (dynamic_cast<MoveToTargetState*>(pCurrentState) &&
+        myTeam && myTeam[2] && myTeam[2]->getHp() > 0) {
+      fleeRepathCounter++;
+      if (fleeRepathCounter >= 50) {
+        double mx, my;
+        myTeam[2]->getPosition(mx, my);
+        setTarget(mx, my);
+        PlanPathTo();
+        fleeRepathCounter = 0;
+      }
+    }
+
+    // Follow path while fleeing
+    if (isMoving && FollowPlannedPath(1)) {
+      pCurrentState->Transition(this);
+    }
+    return;
+  }
+
+  // Recovery: HP back above threshold
+  if (isFleeing) {
+    isFleeing = false;
+    std::string color = (team == 1 ? TEAM1 : TEAM2);
+    std::cout << color << "Supply team " << team
+              << ": HP recovered, resuming duties." << RESET << std::endl;
+    if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+    pCurrentState = new GoToArmory();
+    pCurrentState->OnEnter(this);
+  }
+
   // Autonomous: if no warrior assigned and have ammo, scan warriors
   scanCooldown--;
   if (!pWarrior && ammo >= AMMO_MAX * 0.3 && !isFillingAmmo &&

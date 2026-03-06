@@ -15,6 +15,7 @@ private:
 
     int scanCooldown = 0;
     int followCooldown = 0;
+    bool isFleeing = false;
 
 public:
     MedicNPC(double positionX, double positionY, char character, int team, int type);

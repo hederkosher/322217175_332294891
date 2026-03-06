@@ -1,5 +1,7 @@
 #include "MedicNPC.h"
 #include "GoToTarget.h"
+#include "GoToDefenseState.h"
+#include "IdleState.h"
 #include <iostream>
 
 static int medic_counter = 0;
@@ -45,6 +47,57 @@ NPC* MedicNPC::FindInjuredTeammate()
 
 void MedicNPC::DoSomeWork()
 {
+	// Priority 0: Self-preservation -- flee when HP is critically low
+	double fleeThreshold = MAX_HP * 0.4;
+	if (hp < fleeThreshold && hp > 0) {
+		if (!isFleeing) {
+			isFleeing = true;
+			std::string color = (team == 1 ? TEAM1 : TEAM2);
+			std::cout << color << "Medic team " << team
+				<< ": HP critical (" << (int)hp << "), retreating!" << RESET << std::endl;
+
+			// Interrupt current activity
+			isGivingMedicine = false;
+			isFillingMedicine = false;
+			stayedAtMedicine = false;
+			goToTarget = false;
+			if (pTarget) {
+				pTarget->setIsGettingHp(false);
+				pTarget = nullptr;
+			}
+
+			if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+			pCurrentState = new GoToDefenseState();
+			pCurrentState->OnEnter(this);
+		}
+
+		// Self-heal while in cover
+		if ((dynamic_cast<GoToDefenseState*>(pCurrentState) ||
+		     dynamic_cast<IdleState*>(pCurrentState)) && medicine > 0) {
+			hp += 0.5;
+			medicine -= 0.1;
+			if (hp > MAX_HP) hp = MAX_HP;
+			if (medicine < 0) medicine = 0;
+		}
+
+		// Still follow path if moving to cover
+		if (isMoving && FollowPlannedPath(1)) {
+			pCurrentState->Transition(this);
+		}
+		return;
+	}
+
+	// Recovery: HP back above threshold
+	if (isFleeing) {
+		isFleeing = false;
+		std::string color = (team == 1 ? TEAM1 : TEAM2);
+		std::cout << color << "Medic team " << team
+			<< ": HP recovered, resuming duties." << RESET << std::endl;
+		if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+		pCurrentState = new GoToMedicine();
+		pCurrentState->OnEnter(this);
+	}
+
 	// Autonomous: if no target and have medicine, scan teammates
 	scanCooldown--;
 	if (!pTarget && medicine >= MEDICINE_MAX * 0.3 && !isFillingMedicine && scanCooldown <= 0)
