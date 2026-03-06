@@ -15,6 +15,7 @@ const int MAX_HP = 1000;
 const int AMMO_MAX = 100;
 const int MEDICINE_MAX = 100;
 const double SECURITY = 0.003;
+const int HEAL_RANGE = 4;  // cells; medic transitions to GiveMedicine when within this range of target
 
 const int TEAM_SIZE = 4; // 2 Warriors + 1 Medic + 1 Supply
 

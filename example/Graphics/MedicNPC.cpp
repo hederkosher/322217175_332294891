@@ -80,10 +80,14 @@ void MedicNPC::DoSomeWork()
 			if (medicine < 0) medicine = 0;
 		}
 
-		// Still follow path if moving to cover
+		// Still follow path if moving to cover — only "arrive" when in a room
 		if (isMoving && FollowPlannedPath(1)) {
-			if (pCurrentState)
-				pCurrentState->Transition(this);
+			if (!IsInCorridor()) {
+				if (pCurrentState)
+					pCurrentState->Transition(this);
+			} else {
+				MoveToNearestRoom();
+			}
 		}
 		return;
 	}
@@ -127,11 +131,28 @@ void MedicNPC::DoSomeWork()
 			if (medic_counter % 50 == 0)
 				PlanPathTo();
 			medic_counter++;
-		}
-		if (FollowPlannedPath(1))
-		{
-			if (pCurrentState)
-				pCurrentState->Transition(this);
+			// Transition when within healing range (fixes chase deadlock with moving Supply)
+			if (Distance(x, y, pos_x, pos_y) <= HEAL_RANGE) {
+				if (pCurrentState)
+					pCurrentState->Transition(this);
+			} else if (FollowPlannedPath(1)) {
+				if (!IsInCorridor()) {
+					if (pCurrentState)
+						pCurrentState->Transition(this);
+				} else {
+					MoveToNearestRoom();
+				}
+			}
+		} else {
+			// Only treat path complete when in a room (never stop in corridor)
+			if (FollowPlannedPath(1)) {
+				if (!IsInCorridor()) {
+					if (pCurrentState)
+						pCurrentState->Transition(this);
+				} else {
+					MoveToNearestRoom();
+				}
+			}
 		}
 	}
 

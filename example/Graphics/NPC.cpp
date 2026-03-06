@@ -3,6 +3,7 @@
 #include "Map.h"
 #include "SecurityMap.h"
 #include <cmath>
+#include <cstdlib>
 #include <iostream>
 
 NPC::NPC(double positionX, double positionY, char character, int team, int type)
@@ -224,34 +225,29 @@ void NPC::DrawPath() const {
 
 bool NPC::HasLineOfSight(double tX, double tY) const
 {
-	double startX = x + 1.5;
-	double startY = y + 1.5;
-	double currentX = startX;
-	double currentY = startY;
+	int x0 = static_cast<int>(x + 1.5);
+	int y0 = static_cast<int>(y + 1.5);
+	int x1 = static_cast<int>(tX);
+	int y1 = static_cast<int>(tY);
 
-	double dx = tX - startX;
-	double dy = tY - startY;
-	double distance = sqrt(dx * dx + dy * dy);
+	if (x0 == x1 && y0 == y1) return true;
 
-	if (distance < 1.0) return true;
+	// Bresenham line: visit every grid cell the ray crosses so we never miss a corner.
+	int dx = std::abs(x1 - x0), sx = (x0 < x1) ? 1 : -1;
+	int dy = -std::abs(y1 - y0), sy = (y0 < y1) ? 1 : -1;
+	int err = dx + dy;
 
-	double stepSize = 0.5;
-	double stepX = (dx / distance) * stepSize;
-	double stepY = (dy / distance) * stepSize;
-	int numSteps = static_cast<int>(distance / stepSize);
-
-	for (int i = 0; i < numSteps; ++i)
+	for (;;)
 	{
-		currentX += stepX;
-		currentY += stepY;
-		int mapX = static_cast<int>(currentX);
-		int mapY = static_cast<int>(currentY);
-
-		if (mapX < 0 || mapX >= MSZ || mapY < 0 || mapY >= MSZ)
+		if (x0 < 0 || x0 >= MSZ || y0 < 0 || y0 >= MSZ)
 			return false;
-
-		if (map[mapX][mapY] == WALL || map[mapX][mapY] == STONE)
+		if (map[x0][y0] == WALL || map[x0][y0] == STONE)
 			return false;
+		if (x0 == x1 && y0 == y1)
+			break;
+		int e2 = 2 * err;
+		if (e2 >= dy) { err += dy; x0 += sx; }
+		if (e2 <= dx) { err += dx; y0 += sy; }
 	}
 	return true;
 }
