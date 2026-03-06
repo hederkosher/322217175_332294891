@@ -314,25 +314,28 @@ void DrawMap() {
     for (int j = 0; j < MSZ; j++) {
       switch (map[i][j]) {
       case FLOOR:
-        if (roomId[i][j] > 0)
-          glColor3d(0.85, 0.85, 0.75); // room floor
-        else
-          glColor3d(0.7, 0.7, 0.65); // passage floor
+        if (roomId[i][j] > 0) {
+          // Subtle per-room tint so rooms feel distinct
+          double shade = 0.06 + (roomId[i][j] % 3) * 0.01;
+          glColor3d(shade, shade + 0.02, shade + 0.08);
+        } else {
+          glColor3d(0.04, 0.05, 0.09); // corridor: darker blue-gray
+        }
         break;
       case WALL:
-        glColor3d(0.2, 0.2, 0.25);
+        glColor3d(0.02, 0.02, 0.04);
         break;
       case STONE:
-        glColor3d(0.45, 0.42, 0.38);
+        glColor3d(0.35, 0.32, 0.28);
         break;
       case ARMORY:
-        glColor3d(0.9, 0.75, 0.1); // gold for armory
+        glColor3d(0.55, 0.38, 0.05); // dark gold base
         break;
       case MEDICINE:
-        glColor3d(0.9, 0.2, 0.3); // red/pink for medicine
+        glColor3d(0.82, 0.82, 0.85); // light panel base
         break;
       default:
-        glColor3d(0.2, 0.2, 0.25);
+        glColor3d(0.02, 0.02, 0.04);
         break;
       }
 
@@ -345,9 +348,9 @@ void DrawMap() {
     }
   }
 
-  // Draw room outlines for clarity
-  glColor3d(0.3, 0.3, 0.35);
-  glLineWidth(1.0f);
+  // Cyan room outlines
+  glColor3d(0.0, 0.7, 1.0);
+  glLineWidth(1.5f);
   for (int r = 0; r < numRooms; r++) {
     glBegin(GL_LINE_LOOP);
     glVertex2d(rooms[r].x1, rooms[r].y1);
@@ -356,14 +359,65 @@ void DrawMap() {
     glVertex2d(rooms[r].x1, rooms[r].y2 + 1);
     glEnd();
   }
+  glLineWidth(1.0f);
 
-  // Draw 'A' on armories and '+' on medicine depots
-  glColor3d(0.0, 0.0, 0.0);
+  // Armory depots: bright gold overlay + dark inner border + 'A' label
   for (int d = 0; d < 2; d++) {
-    glRasterPos2d(armoryX[d] + 0.8, armoryY[d] + 0.8);
-    glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, 'A');
+    double ax = armoryX[d], ay = armoryY[d];
 
-    glRasterPos2d(medicineX[d] + 0.8, medicineY[d] + 0.8);
-    glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, '+');
+    // Bright gold fill
+    glColor3d(0.9, 0.75, 0.1);
+    glBegin(GL_QUADS);
+    glVertex2d(ax + 0.15, ay + 0.15);
+    glVertex2d(ax + 2.85, ay + 0.15);
+    glVertex2d(ax + 2.85, ay + 2.85);
+    glVertex2d(ax + 0.15, ay + 2.85);
+    glEnd();
+
+    // Dark outline
+    glColor3d(0.3, 0.2, 0.0);
+    glLineWidth(1.5f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2d(ax + 0.15, ay + 0.15);
+    glVertex2d(ax + 2.85, ay + 0.15);
+    glVertex2d(ax + 2.85, ay + 2.85);
+    glVertex2d(ax + 0.15, ay + 2.85);
+    glEnd();
+    glLineWidth(1.0f);
+
+    // 'A' label in dark brown
+    glColor3d(0.2, 0.1, 0.0);
+    glRasterPos2d(ax + 0.8, ay + 0.8);
+    glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, 'A');
+  }
+
+  // Medicine depots: white panel + bold red cross
+  for (int d = 0; d < 2; d++) {
+    double mx = medicineX[d], my = medicineY[d];
+
+    // White panel
+    glColor3d(0.95, 0.95, 0.97);
+    glBegin(GL_QUADS);
+    glVertex2d(mx + 0.15, my + 0.15);
+    glVertex2d(mx + 2.85, my + 0.15);
+    glVertex2d(mx + 2.85, my + 2.85);
+    glVertex2d(mx + 0.15, my + 2.85);
+    glEnd();
+
+    // Red cross (horizontal bar)
+    glColor3d(0.9, 0.1, 0.2);
+    glBegin(GL_QUADS);
+    glVertex2d(mx + 0.4,  my + 1.1);
+    glVertex2d(mx + 2.6,  my + 1.1);
+    glVertex2d(mx + 2.6,  my + 1.9);
+    glVertex2d(mx + 0.4,  my + 1.9);
+    glEnd();
+    // Red cross (vertical bar)
+    glBegin(GL_QUADS);
+    glVertex2d(mx + 1.1,  my + 0.4);
+    glVertex2d(mx + 1.9,  my + 0.4);
+    glVertex2d(mx + 1.9,  my + 2.6);
+    glVertex2d(mx + 1.1,  my + 2.6);
+    glEnd();
   }
 }

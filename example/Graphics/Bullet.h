@@ -3,12 +3,21 @@
 #include "NPC.h"
 
 class Bullet {
+public:
+  static const int TRAIL_LEN = 20;
+
 private:
   double x, y;
   bool isMoving;
   double dirX, dirY;
   int team;
   double damage;
+
+  // Trail ring buffer
+  double trailX[TRAIL_LEN];
+  double trailY[TRAIL_LEN];
+  int trailIdx  = 0;
+  int trailCount = 0;
 
 public:
   Bullet(double xPos, double yPos, double angle, int team, double damage);

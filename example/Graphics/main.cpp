@@ -16,6 +16,7 @@
 using namespace std;
 
 int gameWinner = 0; // 0 = playing, 1 = team1, 2 = team2
+bool gameStarted  = false;
 
 const int MATCH_DURATION_MS = 60000; // 1 minute
 int gameStartTime = 0;
@@ -36,10 +37,41 @@ void drawText(double x, double y, const char *text, void *font) {
   }
 }
 
+// 5-line ASCII-art logo for the start screen (GLUT_BITMAP_9_BY_15, ~1 unit/char)
+static void drawStartScreen() {
+  // Full-screen dark overlay
+  glColor3d(0.02, 0.02, 0.08);
+  glBegin(GL_QUADS);
+  glVertex2d(0, 0); glVertex2d(100, 0);
+  glVertex2d(100, 100); glVertex2d(0, 100);
+  glEnd();
+
+  // 5-line "SMART WARFARE" ASCII art logo in cyan
+  static const char *logo[5] = {
+    " ____  __  __    _    ____ _____   __        ___    ____  _____ _    ____  ___ ",
+    "/ ___||  \\/  |  / \\  |  _ \\_   _|  \\ \\      / / \\  |  _ \\|  ___/ \\  |  _ \\| __|",
+    "\\___ \\| |\\/| | / _ \\ | |_) || |     \\ \\ /\\ / / _ \\ |    /| |_ / _ \\ |    /|  _|",
+    " ___) | |  | |/ ___ \\|  _ < | |      \\ V  V / ___ \\| |\\ \\|  _/ ___ \\| |\\ \\| |___",
+    "|____/|_|  |_/_/   \\_\\_| \\_\\|_|       \\_/\\_/_/   \\_\\_| \\_\\_|/_/   \\_\\_| \\_\\____|"
+  };
+  void *smallFont = GLUT_BITMAP_9_BY_15;
+  glColor3d(0.0, 0.9, 1.0);
+  for (int i = 0; i < 5; i++)
+    drawText(10.0, 83.0 - i * 4.0, logo[i], smallFont);
+
+  // Call-to-action
+  glColor3d(0.0, 0.9, 1.0);
+  drawText(30.0, 48.0, "Press any key to start", GLUT_BITMAP_TIMES_ROMAN_24);
+
+  // Right-click hint
+  glColor3d(0.7, 0.7, 0.7);
+  drawText(2.0, 2.0, "Right-click for view menu", smallFont);
+}
+
 void init() {
   srand((unsigned)time(NULL));
-  // Use float literals to match GLclampf and avoid truncation warnings
-  glClearColor(0.0f, 0.5f, 0.8f, 0.0f);
+  // Dark blue-black background
+  glClearColor(0.01f, 0.01f, 0.04f, 0.0f);
   glOrtho(0, 100, 0, 100, -1, 1);
   InitMap(team1, team2);
   CreateSecurityMap();
@@ -58,7 +90,14 @@ void init() {
   cout << "Map: " << numRooms << " rooms connected by passages" << endl;
   cout << "Match duration: 60 seconds" << endl;
 
-  gameStartTime = glutGet(GLUT_ELAPSED_TIME);
+  // gameStartTime is set when the player presses a key to start
+}
+
+void keyboard(unsigned char /*key*/, int /*x*/, int /*y*/) {
+  if (!gameStarted) {
+    gameStarted  = true;
+    gameStartTime = glutGet(GLUT_ELAPSED_TIME);
+  }
 }
 
 void showBullet(NPCType warrior, NPC **team) {
@@ -97,32 +136,44 @@ void display() {
   showGranade(NPCType::Warrior_1, team2);
   showGranade(NPCType::Warrior_2, team2);
 
-  // Draw timer at top center
-  if (gameWinner == 0) {
-    int elapsed = glutGet(GLUT_ELAPSED_TIME) - gameStartTime;
-    int remaining = (MATCH_DURATION_MS - elapsed) / 1000;
+  // Timer (only while game is running)
+  if (gameWinner == 0 && gameStarted) {
+    int elapsed    = glutGet(GLUT_ELAPSED_TIME) - gameStartTime;
+    int remaining  = (MATCH_DURATION_MS - elapsed) / 1000;
     if (remaining < 0) remaining = 0;
     int mins = remaining / 60;
     int secs = remaining % 60;
     char timerBuf[16];
     sprintf(timerBuf, "%d:%02d", mins, secs);
 
-    glColor3d(1.0, 1.0, 1.0);
+    // White normally, urgent red when < 10 s
+    if (remaining < 10)
+      glColor3d(1.0, 0.2, 0.2);
+    else
+      glColor3d(1.0, 1.0, 1.0);
     drawText(46, 97, timerBuf, GLUT_BITMAP_TIMES_ROMAN_24);
   }
 
+  // Win / draw screen
   if (gameWinner != 0) {
-    glColor3d(0.0, 0.0, 0.0);
     void *font = GLUT_BITMAP_TIMES_ROMAN_24;
-    string message = "";
-    if (gameWinner == 1)
-      message = "TEAM 1 WINS!";
-    else if (gameWinner == 2)
-      message = "TEAM 2 WINS!";
-    else
-      message = "DRAW!";
-    drawText(40, 50, message.c_str(), font);
+    if (gameWinner == 1) {
+      glColor3d(1.0, 0.4, 0.0);          // team 1 orange-red
+      drawText(38, 54, "TEAM 1 WINS!", font);
+    } else if (gameWinner == 2) {
+      glColor3d(0.0, 0.8, 1.0);          // team 2 cyan
+      drawText(38, 54, "TEAM 2 WINS!", font);
+    } else {
+      glColor3d(1.0, 0.8, 0.0);          // draw: yellow
+      drawText(44, 54, "DRAW!", font);
+    }
+    glColor3d(0.7, 0.7, 0.7);
+    drawText(26, 46, "Right-click to switch views", GLUT_BITMAP_9_BY_15);
   }
+
+  // Start-screen overlay drawn last so it sits on top of the map preview
+  if (!gameStarted)
+    drawStartScreen();
 
   glutSwapBuffers();
 }
@@ -162,6 +213,12 @@ void GranadeMovement(NPCType warrior, NPC **team) {
 }
 
 void idle() {
+  // Freeze everything until the player starts the match
+  if (!gameStarted) {
+    glutPostRedisplay();
+    return;
+  }
+
   if (gameWinner != 0) {
     glutPostRedisplay();
     return;
@@ -299,6 +356,7 @@ int main(int argc, char *argv[]) {
   glutDisplayFunc(display);
   glutIdleFunc(idle);
   glutMouseFunc(MouseClick);
+  glutKeyboardFunc(keyboard);
 
   glutCreateMenu(menu);
   glutAddMenuEntry("Show Security Map", 1);

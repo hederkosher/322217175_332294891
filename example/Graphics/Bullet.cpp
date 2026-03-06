@@ -66,6 +66,12 @@ void Bullet::Move(int map[MSZ][MSZ], NPC** team1, NPC** team2, double securityMa
 {
     if (!isMoving) return;
 
+    // Record current position in trail before moving
+    trailX[trailIdx] = x;
+    trailY[trailIdx] = y;
+    trailIdx = (trailIdx + 1) % TRAIL_LEN;
+    if (trailCount < TRAIL_LEN) trailCount++;
+
     double nextX = x + SPEED * dirX;
     double nextY = y + SPEED * dirY;
 
@@ -106,6 +112,12 @@ void Bullet::Move(int map[MSZ][MSZ], NPC** team1, NPC** team2,
                   bool hitTeam1[TEAM_SIZE], bool hitTeam2[TEAM_SIZE])
 {
     if (!isMoving) return;
+
+    // Record current position in trail before moving
+    trailX[trailIdx] = x;
+    trailY[trailIdx] = y;
+    trailIdx = (trailIdx + 1) % TRAIL_LEN;
+    if (trailCount < TRAIL_LEN) trailCount++;
 
     double nextX = x + SPEED * dirX;
     double nextY = y + SPEED * dirY;
@@ -149,14 +161,40 @@ void Bullet::Move(int map[MSZ][MSZ], NPC** team1, NPC** team2,
 
 void Bullet::Show()
 {
-    if (!isMoving) return;
-    glColor3d(1, 0, 0);
-    glBegin(GL_POLYGON);
-    glVertex2d(x - 0.5, y);
-    glVertex2d(x, y + 0.5);
-    glVertex2d(x + 0.5, y);
-    glVertex2d(x, y - 0.5);
-    glEnd();
+    if (!isMoving && trailCount == 0) return;
+
+    // Team colours: team 1 = orange-red, team 2 = cyan
+    double cr, cg, cb;
+    if (team == 1) { cr = 1.0; cg = 0.4; cb = 0.0; }
+    else           { cr = 0.0; cg = 0.8; cb = 1.0; }
+
+    // --- fading trail ---
+    if (trailCount > 1) {
+        for (int i = 0; i < trailCount - 1; i++) {
+            int a  = (trailIdx - trailCount + i     + TRAIL_LEN * 2) % TRAIL_LEN;
+            int b2 = (trailIdx - trailCount + i + 1 + TRAIL_LEN * 2) % TRAIL_LEN;
+            double fade = (double)(i + 1) / trailCount;
+            glColor3d(cr * fade, cg * fade, cb * fade);
+            glLineWidth((float)(2.5 * fade + 0.5));
+            glBegin(GL_LINES);
+            glVertex2d(trailX[a],  trailY[a]);
+            glVertex2d(trailX[b2], trailY[b2]);
+            glEnd();
+        }
+        glLineWidth(1.0f);
+    }
+
+    // --- bullet head (only while moving) ---
+    if (isMoving) {
+        const double r = 0.25;
+        glColor3d(cr, cg, cb);
+        glBegin(GL_POLYGON);
+        glVertex2d(x - r, y);
+        glVertex2d(x,     y + r);
+        glVertex2d(x + r, y);
+        glVertex2d(x,     y - r);
+        glEnd();
+    }
 }
 
 bool Bullet::getIsMoving() const {

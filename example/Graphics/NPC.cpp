@@ -60,11 +60,32 @@ void NPC::setMovingDirection()
 
 void NPC::show()
 {
-	double size = 3.0;
+	const double size = 3.0;
 
-	if (team == 1) glColor3d(1.0, 0.5, 0.0);
-	else           glColor3d(0.0, 0.6, 1.0);
+	// Role-based body colour; supply keeps a team tint for identification
+	double cr, cg, cb;
+	if (symbol == 'M') {
+		cr = 0.0;  cg = 0.9;  cb = 0.4;   // medic: bright green
+	} else if (symbol == 'P') {
+		if (team == 1) { cr = 0.9; cg = 0.55; cb = 0.0; }  // supply t1: warm orange
+		else           { cr = 0.0; cg = 0.6;  cb = 0.9; }  // supply t2: muted cyan
+	} else {
+		// warrior: vivid team colour
+		if (team == 1) { cr = 1.0; cg = 0.2;  cb = 0.0; }
+		else           { cr = 0.0; cg = 0.75; cb = 1.0; }
+	}
 
+	// Soft glow (slightly larger, 30 % brightness quad behind body)
+	glColor3d(cr * 0.3, cg * 0.3, cb * 0.3);
+	glBegin(GL_QUADS);
+	glVertex2d(x - 0.5, y - 0.5);
+	glVertex2d(x + size + 0.5, y - 0.5);
+	glVertex2d(x + size + 0.5, y + size + 0.5);
+	glVertex2d(x - 0.5, y + size + 0.5);
+	glEnd();
+
+	// Body
+	glColor3d(cr, cg, cb);
 	glBegin(GL_QUADS);
 	glVertex2d(x, y);
 	glVertex2d(x + size, y);
@@ -72,23 +93,21 @@ void NPC::show()
 	glVertex2d(x, y + size);
 	glEnd();
 
-	glColor3d(0, 0, 0);
+	// Role symbol in white
+	glColor3d(1.0, 1.0, 1.0);
 	glRasterPos2d(x + 0.9, y + 0.5);
 	glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, symbol);
 
-	// HP bar
-	glLineWidth(2);
+	// HP bar: red (low) → green (full)
 	double normalizedHP = hp / MAX_HP;
-	double red = 1.0 - normalizedHP;
-	double green = normalizedHP;
-	glColor3d(red, green, 0.0);
-
+	if (normalizedHP < 0.0) normalizedHP = 0.0;
+	glLineWidth(2.5f);
+	glColor3d(1.0 - normalizedHP, normalizedHP, 0.2);
 	glBegin(GL_LINES);
-	glVertex2d(x, y + 3.5);
-	glVertex2d(x + hp * 0.003, y + 3.5);
+	glVertex2d(x, y + size + 0.5);
+	glVertex2d(x + normalizedHP * size, y + size + 0.5);
 	glEnd();
-
-	glLineWidth(1);
+	glLineWidth(1.0f);
 }
 
 void NPC::setIsMoving(bool value) { isMoving = value; }

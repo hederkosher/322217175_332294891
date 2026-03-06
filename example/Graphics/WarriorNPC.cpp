@@ -407,11 +407,11 @@ void WarriorNPC::show() {
     na = 1.0;
 
   if (na < 0.20)
-    glColor3d(1.0, 0.0, 0.0);
+    glColor3d(1.0, 0.1, 0.1);      // critical: red
   else if (na < 0.60)
-    glColor3d(0.0, 0.0, 0.6);
+    glColor3d(0.9, 0.7, 0.0);      // low: yellow
   else
-    glColor3d(0.6, 0.0, 0.8);
+    glColor3d(0.0, 0.8, 0.6);      // good: teal-green
 
   double fillH = barH * na;
   glBegin(GL_QUADS);

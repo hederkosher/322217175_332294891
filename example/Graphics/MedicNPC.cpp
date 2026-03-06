@@ -256,9 +256,9 @@ void MedicNPC::show() {
 	if (na < 0.0) na = 0.0;
 	if (na > 1.0) na = 1.0;
 
-	if (na < 0.20)        glColor3d(0.8, 0.1, 0.1);
-	else if (na < 0.60)   glColor3d(0.5, 0.8, 0.2);
-	else                  glColor3d(0.0, 0.9, 0.7);
+	if (na < 0.20)        glColor3d(1.0, 0.1, 0.1);      // critical: red
+	else if (na < 0.60)   glColor3d(0.9, 0.7, 0.0);      // low: yellow
+	else                  glColor3d(0.0, 0.9, 0.7);       // good: cyan-green
 
 	double fillH = barH * na;
 	glBegin(GL_QUADS);
