@@ -7,6 +7,8 @@
 *.obj
 *.exe
 *.pdb
+example/Graphics/Debug/Graphics.Build.CppClean.log
+example/Graphics/Debug/vc143.idb
 Graphics/Debug/Graphics.log
 Graphics/Debug/Graphics.exe
 Graphics/Debug/Graphics.pdb
