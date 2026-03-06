@@ -20,5 +20,6 @@ void GiveAmmo::OnExit(NPC *pn) {
   if (auto ln = dynamic_cast<SupplyNPC *>(pn)) {
     ln->setIsGivingAmmo(false);
     ln->setGoToWarrior(false);
+    ln->setWarriorPointer(nullptr);
   }
 }

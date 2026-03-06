@@ -144,6 +144,13 @@ void MedicNPC::DoSomeWork()
 			if (pTarget->getHp() < MAX_HP && pTarget->getHp() > 0)
 				pCurrentState->Transition(this);
 		}
+		else
+		{
+			// Medicine full but no target -- exit FillMedicine so scan code can run
+			if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+			pCurrentState = nullptr;
+			isFillingMedicine = false;
+		}
 	}
 
 	if (stayedAtMedicine)

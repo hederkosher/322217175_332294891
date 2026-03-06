@@ -155,6 +155,11 @@ void SupplyNPC::DoSomeWork() {
       ammo += 0.1;
     } else if (pWarrior) {
       pCurrentState->Transition(this);
+    } else {
+      // Ammo full but no warrior -- exit FillAmmo so scan code can run
+      if (pCurrentState) { pCurrentState->OnExit(this); delete pCurrentState; }
+      pCurrentState = nullptr;
+      isFillingAmmo = false;
     }
   }
 
