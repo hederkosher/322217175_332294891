@@ -3,7 +3,7 @@
 
 class NPC;
 
-class GoToTarget : public State
+class GoToInjuredState : public State
 {
 public:
 	void OnEnter(NPC* pn);

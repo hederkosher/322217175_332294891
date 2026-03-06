@@ -85,7 +85,7 @@ bool WarriorNPC::FindVisibleEnemy(double &outX, double &outY) {
 }
 
 void WarriorNPC::EvaluatePriorities() {
-  if (isGettingHp)
+  if (isBeingHealed)
     return;
 
   double hpRatio = hp / MAX_HP;
@@ -208,7 +208,7 @@ void WarriorNPC::DoSomeWork() {
   if (pCurrentState)
     pCurrentState->Transition(this);
 
-  if (isMoving && !isGettingHp) {
+  if (isMoving && !isBeingHealed) {
     arrivedAtTarget = false;
     if (FollowPlannedPath(0.15)) {
       arrivedAtTarget = true;
@@ -225,7 +225,7 @@ void WarriorNPC::DoSomeWork() {
     }
   }
 
-  if (!isMoving && !isGettingHp && !isAttacking) {
+  if (!isMoving && !isBeingHealed && !isAttacking) {
     framesAtTarget++;
     if (framesAtTarget > 120) {
       framesAtTarget = 0;

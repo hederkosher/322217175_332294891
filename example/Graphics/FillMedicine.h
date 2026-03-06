@@ -1,6 +1,6 @@
 #pragma once
 #include "State.h"
-#include "GoToTarget.h"
+#include "GoToInjuredState.h"
 
 class NPC;
 

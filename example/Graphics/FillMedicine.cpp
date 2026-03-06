@@ -13,7 +13,7 @@ void FillMedicine::Transition(NPC* pn)
 {
 	OnExit(pn);
 	if (auto mn = dynamic_cast<MedicNPC*>(pn)) {
-		pn->setCurrentState(new GoToTarget());
+		pn->setCurrentState(new GoToInjuredState());
 		pn->getCurrentState()->OnEnter(pn);
 	}
 }

@@ -103,8 +103,8 @@ void NPC::setHp(double value) { hp = value; }
 
 int NPC::getNpcType() { return npcType; }
 
-bool NPC::getIsGettingHp() { return isGettingHp; }
-void NPC::setIsGettingHp(bool value) { isGettingHp = value; }
+bool NPC::getIsBeingHealed() { return isBeingHealed; }
+void NPC::setIsBeingHealed(bool value) { isBeingHealed = value; }
 
 int (*NPC::getVisibilityMap())[MSZ] {
 	return visibilityMap;

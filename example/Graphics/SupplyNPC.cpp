@@ -1,5 +1,5 @@
 #include "SupplyNPC.h"
-#include "GoToWarrior.h"
+#include "GoToNeedyWarriorState.h"
 #include <iostream>
 
 static int counter = 0;
@@ -14,15 +14,15 @@ SupplyNPC::SupplyNPC(double positionX, double positionY, char character,
 
 void SupplyNPC::setWarriorPointer(WarriorNPC *pW) { pWarrior = pW; }
 WarriorNPC *SupplyNPC::getWarriorPointer() { return pWarrior; }
-bool SupplyNPC::getGoToWarrior() { return goToWarrior; }
-void SupplyNPC::setGoToWarrior(bool goToW) { goToWarrior = goToW; }
+bool SupplyNPC::getGoToNeedyWarrior() { return goToNeedyWarrior; }
+void SupplyNPC::setGoToNeedyWarrior(bool goToW) { goToNeedyWarrior = goToW; }
 bool SupplyNPC::getIsGivingAmmo() { return isGivingAmmo; }
 void SupplyNPC::setIsGivingAmmo(bool isGive) { isGivingAmmo = isGive; }
 bool SupplyNPC::getIsFillingAmmo() { return isFillingAmmo; }
 void SupplyNPC::setIsFillingAmmo(bool isFill) { isFillingAmmo = isFill; }
 void SupplyNPC::setAmmo(double value) { ammo = value; }
-bool SupplyNPC::getStayedAtArmory() { return stayedAtArmory; }
-void SupplyNPC::setStayedAtArmory(bool stayed) { stayedAtArmory = stayed; }
+bool SupplyNPC::getWaitingAtArmory() { return waitingAtArmory; }
+void SupplyNPC::setWaitingAtArmory(bool stayed) { waitingAtArmory = stayed; }
 
 WarriorNPC *SupplyNPC::FindWarriorNeedingAmmo() {
   if (!myTeam)
@@ -61,15 +61,15 @@ void SupplyNPC::DoSomeWork() {
         pCurrentState->OnExit(this);
         delete pCurrentState;
       }
-      pCurrentState = new GoToWarrior();
+      pCurrentState = new GoToNeedyWarriorState();
       pCurrentState->OnEnter(this);
     }
     scanCooldown = 120;
   }
 
-  if (isMoving && !isGettingHp) {
+  if (isMoving && !isBeingHealed) {
     double warrior_x, warrior_y;
-    if (goToWarrior && pWarrior) {
+    if (goToNeedyWarrior && pWarrior) {
       pWarrior->getPosition(warrior_x, warrior_y);
       setTarget(warrior_x, warrior_y);
       if (counter % 50 == 0)
@@ -90,11 +90,11 @@ void SupplyNPC::DoSomeWork() {
     }
   }
 
-  if (stayedAtArmory) {
+  if (waitingAtArmory) {
     if (pWarrior && pWarrior->getAmmo() < AMMO_MAX) {
       if (ammo >= AMMO_MAX)
-        if (auto GoToWarriorState = dynamic_cast<GoToWarrior *>(pCurrentState))
-          GoToWarriorState->OnEnter(this);
+        if (auto goToNeedyWarriorState = dynamic_cast<GoToNeedyWarriorState *>(pCurrentState))
+          goToNeedyWarriorState->OnEnter(this);
     }
   }
 

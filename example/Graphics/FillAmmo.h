@@ -1,6 +1,6 @@
 #pragma once
 #include "State.h"
-#include "GoToWarrior.h"
+#include "GoToNeedyWarriorState.h"
 
 class NPC;
 
