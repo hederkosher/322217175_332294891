@@ -5,7 +5,6 @@
 #include <cmath>
 #include <iostream>
 
-
 NPC::NPC(double positionX, double positionY, char character, int team, int type)
 {
 	x = positionX;

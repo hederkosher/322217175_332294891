@@ -2,12 +2,12 @@
 #include "AttackState.h"
 #include "Bullet.h"
 #include "GoToDefenseState.h"
+#include "IdleState.h"
 #include "Map.h"
 #include "MoveToTargetState.h"
 #include <algorithm>
 #include <iostream>
 #include <math.h>
-
 
 extern int map[MSZ][MSZ];
 
@@ -33,6 +33,10 @@ WarriorNPC::WarriorNPC(double positionX, double positionY, char character,
 
   setCurrentState(new MoveToTargetState());
   getCurrentState()->OnEnter(this);
+
+  // Immediately choose an exploration target so warriors are not idle/stuck
+  // at match start with isMoving=true but no path planned.
+  SearchForEnemies();
 }
 
 bool WarriorNPC::isInRisk() const {
@@ -189,8 +193,10 @@ void WarriorNPC::SearchForEnemies() {
 
   Room *room = GetRoomById(targetRoom);
   if (room) {
-    int tx = room->x1 + 3 + rand() % max(1, room->x2 - room->x1 - 6);
-    int ty = room->y1 + 3 + rand() % max(1, room->y2 - room->y1 - 6);
+    int tx =
+        room->x1 + 3 + rand() % std::max(1, room->x2 - room->x1 - 6);
+    int ty =
+        room->y1 + 3 + rand() % std::max(1, room->y2 - room->y1 - 6);
     setTarget(tx, ty);
     PlanPathTo();
 
@@ -212,15 +218,15 @@ void WarriorNPC::DoSomeWork() {
     arrivedAtTarget = false;
     if (FollowPlannedPath(0.15)) {
       arrivedAtTarget = true;
-      framesAtTarget++;
-
-      // If arrived and idle/moving, search for enemies in new room
-      if (framesAtTarget > 60) {
+      // We just finished the planned path. Immediately pick a new search
+      // target if we're not in a combat/defense state so warriors don't
+      // stand still after a few seconds.
+      if (!dynamic_cast<AttackState *>(pCurrentState) &&
+          !dynamic_cast<GoToDefenseState *>(pCurrentState)) {
         framesAtTarget = 0;
-        if (!dynamic_cast<AttackState *>(pCurrentState) &&
-            !dynamic_cast<GoToDefenseState *>(pCurrentState)) {
-          SearchForEnemies();
-        }
+        SearchForEnemies();
+      } else {
+        framesAtTarget++;
       }
     }
   }

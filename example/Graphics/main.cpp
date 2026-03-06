@@ -34,7 +34,8 @@ void drawText(double x, double y, const char *text, void *font) {
 
 void init() {
   srand(1796);
-  glClearColor(0, 0.5, 0.8, 0);
+  // Use float literals to match GLclampf and avoid truncation warnings
+  glClearColor(0.0f, 0.5f, 0.8f, 0.0f);
   glOrtho(0, 100, 0, 100, -1, 1);
   InitMap(team1, team2);
   CreateSecurityMap();

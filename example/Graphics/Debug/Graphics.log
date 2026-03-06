@@ -1,3 +1,1 @@
-﻿  main.cpp
-C:\Users\idano\DocumentsLocal\GitHub\AISoldiers\Graphics\main.cpp(47,26): warning C4305: 'argument': truncation from 'double' to 'GLclampf'
-  Graphics.vcxproj -> C:\Users\idano\DocumentsLocal\GitHub\AISoldiers\Debug\Graphics.exe
+﻿

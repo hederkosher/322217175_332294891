@@ -42,8 +42,8 @@ Room *GetRoomById(int id) {
 
 // Carve a horizontal corridor segment (3 cells wide)
 static void CarveHorizontalCorridor(int x1, int x2, int y) {
-  int minX = min(x1, x2);
-  int maxX = max(x1, x2);
+  int minX = std::min(x1, x2);
+  int maxX = std::max(x1, x2);
   for (int i = minX; i <= maxX; i++) {
     for (int w = -1; w <= 1; w++) {
       int j = y + w;
@@ -58,8 +58,8 @@ static void CarveHorizontalCorridor(int x1, int x2, int y) {
 
 // Carve a vertical corridor segment (3 cells wide)
 static void CarveVerticalCorridor(int x, int y1, int y2) {
-  int minY = min(y1, y2);
-  int maxY = max(y1, y2);
+  int minY = std::min(y1, y2);
+  int maxY = std::max(y1, y2);
   for (int j = minY; j <= maxY; j++) {
     for (int w = -1; w <= 1; w++) {
       int i = x + w;
@@ -128,8 +128,8 @@ static void PlaceDepots() {
 
     int roomW = rooms[r].x2 - rooms[r].x1 + 1;
     int roomH = rooms[r].y2 - rooms[r].y1 + 1;
-    int ox = rooms[r].x1 + 3 + rand() % max(1, roomW - 8);
-    int oy = rooms[r].y1 + 3 + rand() % max(1, roomH - 8);
+    int ox = rooms[r].x1 + 3 + rand() % std::max(1, roomW - 8);
+    int oy = rooms[r].y1 + 3 + rand() % std::max(1, roomH - 8);
 
     armoryX[d] = ox;
     armoryY[d] = oy;
@@ -154,8 +154,8 @@ static void PlaceDepots() {
 
     int roomW = rooms[r].x2 - rooms[r].x1 + 1;
     int roomH = rooms[r].y2 - rooms[r].y1 + 1;
-    int ox = rooms[r].x1 + 3 + rand() % max(1, roomW - 8);
-    int oy = rooms[r].y1 + 3 + rand() % max(1, roomH - 8);
+    int ox = rooms[r].x1 + 3 + rand() % std::max(1, roomW - 8);
+    int oy = rooms[r].y1 + 3 + rand() % std::max(1, roomH - 8);
 
     medicineX[d] = ox;
     medicineY[d] = oy;
@@ -170,8 +170,8 @@ static void PlaceDepots() {
 // Find a walkable spawn position within a room
 static bool FindSpawnInRoom(const Room &room, double &outX, double &outY) {
   for (int attempt = 0; attempt < 50; attempt++) {
-    int rx = room.x1 + 2 + rand() % max(1, room.x2 - room.x1 - 5);
-    int ry = room.y1 + 2 + rand() % max(1, room.y2 - room.y1 - 5);
+    int rx = room.x1 + 2 + rand() % std::max(1, room.x2 - room.x1 - 5);
+    int ry = room.y1 + 2 + rand() % std::max(1, room.y2 - room.y1 - 5);
 
     bool clear = true;
     for (int i = 0; i < 3 && clear; i++)
@@ -262,8 +262,8 @@ static void GenerateMaze() {
       if (roomH > sectorH - 4)
         roomH = sectorH - 4;
 
-      int marginX = max(0, sectorW - roomW - 4);
-      int marginY = max(0, sectorH - roomH - 4);
+      int marginX = std::max(0, sectorW - roomW - 4);
+      int marginY = std::max(0, sectorH - roomH - 4);
 
       int roomX = sectorX + 2 + (marginX > 0 ? rand() % marginX : 0);
       int roomY = sectorY + 2 + (marginY > 0 ? rand() % marginY : 0);
